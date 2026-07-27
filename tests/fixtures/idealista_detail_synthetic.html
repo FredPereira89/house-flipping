@@ -1,0 +1,35 @@
+<!--
+SYNTHETIC FIXTURE -- this is NOT a captured page. It is a minimal, hand-built
+HTML snippet that exercises the two selectors detail_idealista.parse_detail
+relies on (".comment p" for the description, "picture img" for photo URLs).
+Do not treat this as a real Idealista capture the way debug_page.html was
+once mistaken for one -- there is no genuine idealista.pt detail-page
+fixture in this repo yet.
+-->
+<html>
+  <body>
+    <div class="detail-info">
+      <div class="comment">
+        <p>Apartamento T3 remodelado no centro de Lisboa.
+Excelente exposicao solar, junto a transportes publicos.
+Cozinha equipada, varanda e lugar de garagem.</p>
+      </div>
+    </div>
+
+    <div class="gallery">
+      <picture>
+        <source srcset="https://img4.idealista.pt/blur/WEB_LISTING-M/0/id.pro.pt.image.master/aa/bb/cc/thumb.jpg">
+        <img data-src="https://img4.idealista.pt/blur/WEB_LISTING-M/0/id.pro.pt.image.master/aa/bb/cc/full.jpg" src="https://img4.idealista.pt/placeholder.jpg" alt="Foto 1">
+      </picture>
+      <picture>
+        <img src="https://img4.idealista.pt/blur/WEB_LISTING-M/0/id.pro.pt.image.master/dd/ee/ff/full.jpg" alt="Foto 2">
+      </picture>
+      <picture>
+        <img data-src="https://cdn.example.com/not-idealista.jpg" alt="Foto de outro dominio, deve ser ignorada">
+      </picture>
+      <picture>
+        <img alt="Sem src nem data-src, deve ser ignorada">
+      </picture>
+    </div>
+  </body>
+</html>

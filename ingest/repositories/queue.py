@@ -20,6 +20,37 @@ def get_pending_jobs(conn: Connection, limit: int = 5) -> list[dict]:
     
     return [{"id": r["id"], "url": r["url"], "kind": r["kind"]} for r in rows]
 
+def mark_done(conn: Connection, url: str) -> None:
+    conn.execute(
+        "UPDATE capture_queue SET state = 'done', completed_at = now(), "
+        "updated_at = now() WHERE url = %s",
+        (url,),
+    )
+
+
+def retry_or_fail(conn: Connection, url: str, error: str, max_attempts: int) -> None:
+    """Record a failed capture attempt and decide whether it gets retried.
+
+    Bumps attempts and last_error unconditionally, then leaves the job
+    'pending' (so the next drain retries it) unless this was the
+    max_attempts'th failure, in which case it escalates to 'failed' so a
+    permanently-broken URL doesn't loop forever. Task 3 amendment: without
+    this, any exception mid-capture leaves the row stuck at 'in_progress'
+    (set by get_pending_jobs' claim) with nothing to ever revert it.
+    """
+    conn.execute(
+        """
+        UPDATE capture_queue
+        SET attempts = attempts + 1,
+            last_error = %s,
+            state = CASE WHEN attempts + 1 >= %s THEN 'failed' ELSE 'pending' END,
+            updated_at = now()
+        WHERE url = %s
+        """,
+        (error, max_attempts, url),
+    )
+
+
 def get_active_searches(conn: Connection) -> list[dict]:
     rows = conn.execute(
         """
