@@ -221,6 +221,7 @@ model SourcingLead {
   area         Area?              @relation(fields: [areaId], references: [id])
   priceHistory LeadPriceHistory[]
   tags         LeadTag[]
+  photos       LeadPhoto[]
 
   @@unique([orgId, portal, externalId])
   @@index([orgId, status])
@@ -292,4 +293,40 @@ model CaptureRun {
   @@index([orgId, createdAt])
   @@index([orgId, status])
   @@map("capture_runs")
+}
+
+model CaptureQueue {
+  id          String    @id @default(cuid())
+  orgId       String    @map("org_id")
+  url         String
+  kind        String    @default("detail")
+  state       String    @default("pending")
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error")
+  enqueuedAt  DateTime  @default(now()) @map("enqueued_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([url, kind])
+  @@index([orgId, state])
+  @@map("capture_queue")
+}
+
+model LeadPhoto {
+  id         String   @id @default(cuid())
+  leadId     String   @map("lead_id")
+  sourceUrl  String   @map("source_url")
+  localPath  String   @map("local_path")
+  position   Int      @default(0)
+  width      Int?
+  height     Int?
+  capturedAt DateTime @default(now()) @map("captured_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  lead SourcingLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@map("lead_photos")
 }
