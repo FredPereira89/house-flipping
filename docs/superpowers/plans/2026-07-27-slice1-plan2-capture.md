@@ -328,6 +328,23 @@ setTimeout(sendPayload, Math.random() * 4000 + 3000); // 3-7s delay to bypass Da
 **Files:** 
 - Create: `ingest/routes_detail.py`, `ingest/parsers/detail_idealista.py`, `tests/test_detail_capture.py`
 
+**AMENDMENT (pre-implementation review):** the draft `routes_detail.py`
+below has no failure path. `requests.get(img_url)` has no timeout (can hang
+the request indefinitely on a stalled connection), and there is no
+try/except around the download/parse loop. If anything raises mid-loop, the
+transaction rolls back and the job is left at `state='in_progress'` forever
+— `CaptureQueue` already has `attempts` and `lastError` columns
+(see Task 0's schema) specifically to avoid this, but the draft never
+touches them. Required changes when implementing:
+- Add `timeout=15` (or similar) to every `requests.get(img_url)` call.
+- Wrap the per-job work in try/except. On failure: `UPDATE capture_queue
+  SET state = 'pending', attempts = attempts + 1, last_error = %s,
+  updated_at = now() WHERE url = %s`, so it gets retried on the next drain
+  — and after some max attempts (e.g. 5), set `state = 'failed'` instead so
+  a permanently-broken URL doesn't loop forever. Note there's no need for a
+  `.gitignore` addition for `data/photos/` — root `.gitignore` already
+  ignores `data/` wholesale.
+
 - [ ] **Step 1: Detail Parsing**
 
 `ingest/parsers/detail_idealista.py`:
