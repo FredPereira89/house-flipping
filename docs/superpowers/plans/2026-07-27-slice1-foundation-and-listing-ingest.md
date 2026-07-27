@@ -118,7 +118,9 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - houseflip_pgdata:/var/lib/postgresql/data
+      # postgres:18 moved PGDATA; mounting at /var/lib/postgresql/data
+      # (correct for 16 and earlier) crash-loops on this image.
+      - houseflip_pgdata:/var/lib/postgresql
       - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U houseflip -d houseflip"]
@@ -460,7 +462,21 @@ git commit -m "feat: add Prisma schema for tenancy, auth and reference data"
 **Interfaces:**
 - Produces: tables `sourcing_leads`, `lead_price_history`, `lead_tags`, `alerts`, `capture_runs`; view `v_lead_duplicate_groups`.
 
-- [ ] **Step 1: Append the sourcing models to `web/prisma/schema.prisma`**
+- [ ] **Step 1: Restore the `Area` back-relation, then append the sourcing models**
+
+Task 2 had to delete the line `leads SourcingLead[]` from the `Area` model,
+because `SourcingLead` did not exist yet and Prisma refuses to validate a
+schema with a dangling relation. Now that this task defines `SourcingLead`
+with `area Area? @relation(fields: [areaId], references: [id])`, Prisma
+**requires** the matching back-relation field. Add it back inside `model Area`:
+
+```prisma
+  leads SourcingLead[]
+```
+
+Without it, `prisma migrate dev` fails validation with
+"The relation field `area` on model `SourcingLead` is missing an opposite
+relation field on model `Area`". Then append the models below.
 
 ```prisma
 model SourcingLead {
