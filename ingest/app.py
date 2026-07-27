@@ -31,6 +31,9 @@ def create_app() -> Flask:
     app = Flask(__name__)
     CORS(app)
     config = Config.from_env()
+    
+    from ingest.routes_queue import bp as queue_bp
+    app.register_blueprint(queue_bp)
 
     @app.post("/ingest/listings")
     @require_secret

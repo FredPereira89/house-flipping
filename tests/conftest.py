@@ -33,6 +33,8 @@ def clean_leads(dsn):
         c.execute("DELETE FROM sourcing_leads")
         c.execute("DELETE FROM capture_runs")
         c.execute("DELETE FROM alerts")
+        c.execute("DELETE FROM capture_queue")
+        c.execute("DELETE FROM saved_searches")
         c.commit()
 
 

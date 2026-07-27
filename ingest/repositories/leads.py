@@ -72,3 +72,14 @@ def apply_evaluation(
         (price_per_sqm, discount, status, disqualify_reason,
          disqualify_reason, lead_id),
     )
+    
+    if status == "hot_lead":
+        conn.execute(
+            """
+            INSERT INTO capture_queue (id, org_id, url, kind, state, enqueued_at, updated_at)
+            SELECT gen_random_uuid()::text, org_id, url, 'detail', 'pending', now(), now()
+            FROM sourcing_leads WHERE id = %s
+            ON CONFLICT DO NOTHING
+            """,
+            (lead_id,)
+        )
