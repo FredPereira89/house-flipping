@@ -49,24 +49,26 @@ def test_strips_currency_and_unit_noise_and_handles_thousands_dot():
     assert parse_baselines(URL, html_noisy) == Decimal("1234.00")
 
 
-def test_KNOWN_FRAGILITY_bare_ascii_digit_in_unit_suffix_corrupts_the_price():
-    """Documents a real fragility of the brief's exact regex
-    (``re.sub(r"[^\\d,]", "", price_tag.text)``), not a selector-uncertainty
-    issue: it strips everything except digits and commas from the WHOLE
-    tag text, so any bare ASCII digit anywhere in that text -- not just the
-    leading number -- gets appended to the parsed value. A unit suffix
-    rendered as literal "m2" (as opposed to the superscript "m&sup2;" used
-    in this project's synthetic fixtures) reproduces this: "3.000,00 m2"
-    is corrupted into 3000.002 instead of 3000.00. This is implemented
-    exactly per the brief (see task-4-report.md) rather than patched with
-    an unverified heuristic -- flagging it here so it isn't silently
-    rediscovered later."""
+def test_bare_ascii_digit_in_unit_suffix_no_longer_corrupts_the_price():
+    """Regression test for a real bug found and fixed in fix round 1
+    (see task-4-report.md): the original whole-text-strip regex
+    (``re.sub(r"[^\\d,]", "", price_tag.text)``) stripped everything except
+    digits and commas from the WHOLE tag text, so any bare ASCII digit
+    anywhere in that text -- not just the leading number -- got appended to
+    the parsed value. A unit suffix rendered as literal "m2" (as opposed to
+    the superscript "m&sup2;" used in this project's other synthetic
+    fixtures) used to reproduce this: "3.000,00 EUR/m2" was corrupted into
+    3000.002 instead of 3000.00.
+
+    The parser now anchors to the leading numeric run of the tag's text
+    instead, so trailing unit/currency text -- digits and all -- is never
+    consulted. This does NOT verify the anchor-to-leading-number assumption
+    against real Idealista markup (still unconfirmed, see the parser's
+    module docstring); it only proves this specific corruption is fixed."""
     html_bare_unit_digit = (
         '<div class="price-evolution"><span class="price">3.000,00 EUR/m2</span></div>'
     )
-    corrupted = parse_baselines(URL, html_bare_unit_digit)
-    assert corrupted == Decimal("3000.002")
-    assert corrupted != Decimal("3000.00")
+    assert parse_baselines(URL, html_bare_unit_digit) == Decimal("3000.00")
 
 
 # --- Route tests (require a live DATABASE_URL, like tests/test_queue.py) --

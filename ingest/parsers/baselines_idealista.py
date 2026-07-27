@@ -20,6 +20,16 @@ def parse_baselines(url: str, html: str) -> Decimal | None:
     hit before with debug_page.html being assumed to be a page it wasn't.
     Check this selector against a real captured price-report page before
     trusting this endpoint in production (see task-4-report.md).
+
+    The number-extraction below is anchored to the leading numeric run of
+    the tag's text (fix round 1, see task-4-report.md) rather than
+    stripping non-digit characters from the whole tag text, which fixes a
+    reproducible corruption bug (a trailing unit suffix like a literal
+    "m2" could bleed a digit into the parsed price) -- but this still only
+    narrows how the number is read out of whatever text is there. It does
+    NOT verify that real Idealista markup actually puts the number where
+    this function assumes it is; that remains unconfirmed along with the
+    selector itself.
     """
     soup = BeautifulSoup(html, "html.parser")
     price_tag = soup.select_one(".price-evolution .price")
@@ -30,15 +40,33 @@ def parse_baselines(url: str, html: str) -> Decimal | None:
         return None
 
     # Idealista renders euro amounts with '.' as a thousands separator and
-    # ',' as the decimal separator (e.g. "2.345,67 EUR/m2"). Stripping
-    # everything but digits and commas removes the thousands dot and any
-    # currency/unit text, then the remaining comma is swapped for a dot so
-    # Decimal() parses it correctly.
-    price_text = re.sub(r"[^\d,]", "", price_tag.text).replace(",", ".")
+    # ',' as the decimal separator (e.g. "2.345,67 EUR/m2"). Anchor to the
+    # LEADING numeric run (digits/dots/commas from the start of the trimmed
+    # text) rather than stripping non-digit characters from the whole tag
+    # text: trailing currency/unit text can itself contain a bare ASCII
+    # digit (e.g. a literal "m2" instead of the superscript "m²"),
+    # which a whole-text strip would silently fold into the parsed number
+    # (e.g. "3.000,00 EUR/m2" -> "3000.002" instead of "3000.00"). Anchoring
+    # to the leading run assumes the number leads the tag's text -- no more
+    # of an assumption about the real (still unverified -- see the
+    # docstring above) Idealista markup than the original whole-text
+    # approach already made.
+    stripped_text = price_tag.text.strip()
+    leading_number = re.match(r"[\d.,]+", stripped_text)
+    if not leading_number:
+        logger.warning(
+            "Baseline parse found a '.price-evolution .price' element with no "
+            "leading numeric text for %s: %r", url, stripped_text,
+        )
+        return None
+
+    # Within that leading run, the thousands dot is dropped and the
+    # decimal comma is converted to a dot so Decimal() parses it correctly.
+    price_text = re.sub(r"[^\d,]", "", leading_number.group(0)).replace(",", ".")
     if not price_text:
         logger.warning(
             "Baseline parse found a '.price-evolution .price' element with no "
-            "usable digits for %s: %r", url, price_tag.text,
+            "usable digits for %s: %r", url, stripped_text,
         )
         return None
 
