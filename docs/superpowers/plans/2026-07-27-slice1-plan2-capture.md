@@ -160,6 +160,51 @@ Write `tests/test_queue.py` to assert enqueuing and endpoint behavior.
 - Modify: `extension/manifest.json`, `extension/content.js`
 - Create: `extension/background.js`
 
+**AMENDMENT (pre-implementation review, before Task 2 was executed):** The
+draft code below was written without looking at the extension that already
+exists in this repo. `extension/content.js` (current, legacy) already has
+working per-portal pagination: it finds the "next page" button
+(`.icon-arrow-right-after` / `a.next` for idealista,
+`[data-cy="pagination.next-page"]` for imovirtual,
+`[data-cy="pagination-forward"]` for olx), waits a randomized 3-7s, and
+clicks/navigates. **The draft `content.js` below does not paginate at all —
+it sends exactly one page per tab and reports done.** If implemented as
+written, search capture silently caps at page 1 of every saved search
+forever. This is exactly the kind of silent failure §9 of HANDOFF.md warns
+about (a broken capture and a quiet market look identical), so it must not
+ship this way.
+
+**Required change to the draft below:** the content script must retain the
+existing per-portal next-button pagination loop. When acting on a `kind:
+'search'` job, after POSTing the current page to `/ingest/listings`, look
+for a next-page button. If found, wait 3-7s (randomized), click/navigate,
+and repeat — only send `CAPTURE_DONE` once there is no next-page button
+(or after a sane page cap, e.g. 10 pages, to bound worst-case tab lifetime).
+`kind: 'detail'` and baseline jobs are single-page and unaffected — they
+still send `CAPTURE_DONE` immediately after their one POST.
+
+**Other feedback already on record for this task (see HANDOFF.md §4 —
+implement these as acceptance criteria, don't treat them as optional):**
+- `background.js` needs a fallback timeout (30-60s) that force-closes a tab
+  if it never sends `CAPTURE_DONE` (anti-bot block, crash, etc.) — otherwise
+  tabs leak indefinitely.
+- `runCaptureLoop` must not be allowed to overlap itself if one run is still
+  draining the queue when the next `chrome.alarms` tick fires — use an
+  in-progress flag/lock.
+- The shared secret must not be a literal string in source. Read it from
+  `chrome.storage.local` (set once via the popup or an options page), with
+  the literal only as a documented first-run default.
+- `manifest.json`'s existing `host_permissions` entry for
+  `http://127.0.0.1:5000/` and the new `http://localhost:5000/*` are
+  different origins as far as Chrome's extension permission matching is
+  concerned — pick one consistently across `manifest.json`, `background.js`
+  `API_BASE`, and `content.js`'s fetch target. Don't leave both.
+- `popup.html`/`popup.js` currently gate scraping behind a manual on/off
+  toggle (`chrome.storage.local.autopilot`). D5 requires no manual trigger —
+  the alarm must always drive capture. Repurpose the popup as a read-only
+  status view (last run time, queue depth) rather than removing it outright,
+  since it's useful for debugging.
+
 - [ ] **Step 1: Manifest Upgrade**
 
 `extension/manifest.json`:
