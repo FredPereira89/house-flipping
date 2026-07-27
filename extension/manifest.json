@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Houseflip Sourcing Engine",
+  "version": "2.0",
+  "description": "Self-driving capture extension for the house-flipping sourcing platform.",
+  "permissions": ["alarms", "storage", "tabs", "scripting"],
+  "host_permissions": [
+    "*://*.idealista.pt/*",
+    "*://*.imovirtual.com/*",
+    "*://*.olx.pt/*",
+    "http://localhost:5000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.idealista.pt/*",
+        "*://*.imovirtual.com/*",
+        "*://*.olx.pt/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

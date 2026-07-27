@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>House Flipping</title>
+  <style>
+    body {
+      width: 280px;
+      font-family: Arial, sans-serif;
+      padding: 15px;
+      background-color: #f4f4f9;
+      color: #333;
+    }
+    h3 { margin-top: 0; }
+    .status-card {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 12px;
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+      border-bottom: 1px solid #eee;
+    }
+    .status-row:last-child { border-bottom: none; }
+    .status-row span:first-child { color: #777; }
+    .status-row strong { text-align: right; }
+    .hint {
+      font-size: 12px;
+      color: #777;
+      margin-top: 12px;
+      line-height: 1.4;
+    }
+    .secret-row {
+      margin-top: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .secret-row label { font-size: 12px; color: #555; }
+    .secret-row input {
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .secret-row button {
+      padding: 8px 10px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .secret-row button:hover { background-color: #45a049; }
+    #secretStatus { font-size: 12px; color: #2e7d32; min-height: 14px; }
+  </style>
+</head>
+<body>
+  <h3>Houseflip Sourcing Engine</h3>
+
+  <div class="status-card">
+    <div class="status-row"><span>Last run</span><strong id="lastRunAt">&mdash;</strong></div>
+    <div class="status-row"><span>Status</span><strong id="lastRunStatus">&mdash;</strong></div>
+    <div class="status-row"><span>Queue depth</span><strong id="lastQueueDepth">&mdash;</strong></div>
+  </div>
+
+  <p class="hint">
+    Capture runs automatically in the background every couple of minutes
+    (chrome.alarms). There is no manual on/off switch &mdash; this popup is a
+    read-only status view for debugging.
+  </p>
+
+  <div class="secret-row">
+    <label for="secretInput">Ingest shared secret (X-Ingest-Secret)</label>
+    <input type="password" id="secretInput" placeholder="dev-secret (default)" autocomplete="off">
+    <button id="saveSecretBtn">Save</button>
+    <div id="secretStatus"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
