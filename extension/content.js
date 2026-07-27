@@ -97,13 +97,21 @@ function randomDelayMs(min, max) {
     });
   }
 
+  // Returns whether the capture POST actually succeeded (2xx). Callers must
+  // not treat a thrown/failed request as if the page were captured: for
+  // capture-queue jobs (kind: 'detail'/'baseline'), nothing on the ingest
+  // side yet reverts a claimed row back to 'pending' on failure (that's
+  // /ingest/detail and /ingest/baselines' job -- not yet built, see
+  // task-2-report.md), so reporting a false "success" here would make a
+  // failed capture indistinguishable from a real one instead of just an
+  // untracked queue row.
   async function postCurrentPage(secret) {
     const url = window.location.href;
     const html = document.documentElement.outerHTML;
     const endpoint = resolveEndpoint(url);
 
     try {
-      await fetch(`${API_BASE}${endpoint}`, {
+      const res = await fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -111,8 +119,13 @@ function randomDelayMs(min, max) {
         },
         body: JSON.stringify({ url, html, captured_at: new Date().toISOString() }),
       });
+      if (!res.ok) {
+        console.error(`Houseflip capture: POST ${endpoint} returned ${res.status}`);
+      }
+      return res.ok;
     } catch (err) {
       console.error("Houseflip capture: POST failed", err);
+      return false;
     }
   }
 
@@ -125,8 +138,13 @@ function randomDelayMs(min, max) {
     }
   }
 
-  function reportDone() {
-    chrome.runtime.sendMessage({ type: "CAPTURE_DONE" });
+  // `success: false` tells background.js the capture POST for this page
+  // did not actually go through -- it still closes the tab (no reason to
+  // make the operator wait out the watchdog for a failure we already know
+  // about), but records it as a failure in chrome.storage.local instead of
+  // silently reporting "done" as if the HTML had been ingested.
+  function reportDone(success) {
+    chrome.runtime.sendMessage({ type: "CAPTURE_DONE", success });
   }
 
   async function run() {
@@ -140,16 +158,16 @@ function randomDelayMs(min, max) {
     }
 
     const secret = await getSecret();
-    await postCurrentPage(secret);
+    const postOk = await postCurrentPage(secret);
 
     if (!shouldPaginate(kind, pageIndex, maxSearchPages)) {
-      reportDone();
+      reportDone(postOk);
       return;
     }
 
     const nextBtn = findNextPageButton(window.location.href);
     if (!nextBtn) {
-      reportDone();
+      reportDone(postOk);
       return;
     }
 

@@ -259,7 +259,11 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.alarms) {
     }
 
     if (msg.type === "CAPTURE_DONE") {
-      handleCaptureDone(tabId).then(() => sendResponse({ ok: true }));
+      // Treat anything other than an explicit `false` as success, so older
+      // content-script instances (or a stray message shaped unexpectedly)
+      // don't get misreported as failures.
+      const success = msg.success !== false;
+      handleCaptureDone(tabId, success).then(() => sendResponse({ ok: true }));
       return true;
     }
 
@@ -280,10 +284,23 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.alarms) {
     return { kind: job.kind, pageIndex: job.pageCount, maxSearchPages: MAX_SEARCH_PAGES };
   }
 
-  async function handleCaptureDone(tabId) {
+  async function handleCaptureDone(tabId, success) {
     const job = await getActiveJob();
     if (job && job.tabId === tabId) {
       await clearActiveJob();
+      // Surface capture failures to the popup instead of letting them look
+      // identical to a successful run. This does NOT put the underlying
+      // capture_queue row back to 'pending'/'failed' -- there is currently
+      // no code path anywhere in ingest/ that does that (see task-2-report.md
+      // "fix round 2"); it only makes the failure visible to a human via
+      // lastCaptureResult, since content.js's fetch already told us the POST
+      // didn't succeed.
+      await chrome.storage.local.set({
+        lastCaptureAt: new Date().toISOString(),
+        lastCaptureResult: success
+          ? "ok"
+          : `capture POST failed (kind=${job.kind}, url=${job.jobUrl})`,
+      });
     }
     await closeTab(tabId);
     // Try the next job immediately instead of waiting out the rest of the

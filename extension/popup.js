@@ -13,15 +13,20 @@ function formatTimestamp(iso) {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
-function renderStatus({ lastRunAt, lastRunStatus, lastQueueDepth }) {
+function renderStatus({ lastRunAt, lastRunStatus, lastQueueDepth, lastCaptureAt, lastCaptureResult }) {
   document.getElementById("lastRunAt").textContent = formatTimestamp(lastRunAt);
   document.getElementById("lastRunStatus").textContent = lastRunStatus || "not run yet";
   document.getElementById("lastQueueDepth").textContent =
     typeof lastQueueDepth === "number" ? String(lastQueueDepth) : "—";
+  document.getElementById("lastCaptureAt").textContent = formatTimestamp(lastCaptureAt);
+  document.getElementById("lastCaptureResult").textContent = lastCaptureResult || "n/a";
 }
 
 function refreshStatus() {
-  chrome.storage.local.get(["lastRunAt", "lastRunStatus", "lastQueueDepth"], renderStatus);
+  chrome.storage.local.get(
+    ["lastRunAt", "lastRunStatus", "lastQueueDepth", "lastCaptureAt", "lastCaptureResult"],
+    renderStatus,
+  );
 }
 
 document.addEventListener("DOMContentLoaded", () => {
