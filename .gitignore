@@ -1,0 +1,23 @@
+# Secrets
+.env
+.env.local
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+
+# Node
+node_modules/
+.next/
+out/
+
+# Captured data / debug artefacts
+data/
+captures/
+debug_page.html
+.remember/
+
+# OS
+Thumbs.db
+.DS_Store
