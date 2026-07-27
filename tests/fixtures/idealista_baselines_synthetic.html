@@ -1,0 +1,25 @@
+<!--
+SYNTHETIC FIXTURE -- this is NOT a captured page. It is a minimal, hand-built
+HTML snippet that exercises the ".price-evolution .price" selector
+baselines_idealista.parse_baselines relies on.
+
+UNVERIFIED: nobody on this project has ever captured a real Idealista
+"estatisticas-imobiliarias" (price-report) page. tests/fixtures/
+idealista_search.html is a real capture, but of a SEARCH-RESULTS page, which
+tells us nothing about this page type's actual DOM. Do not treat this file
+as a real Idealista capture the way debug_page.html was once mistaken for
+one -- there is no genuine idealista.pt price-report fixture in this repo
+yet, and the ".price-evolution .price" selector must be checked against a
+real capture before this endpoint is trusted in production.
+
+The price text below deliberately uses Portuguese-style formatting (a '.'
+thousands separator and a ',' decimal separator, plus a currency/unit
+suffix) to exercise the parser's digit/comma stripping.
+-->
+<html>
+  <body>
+    <div class="price-evolution">
+      <span class="price">2.345,67 &euro;/m&sup2;</span>
+    </div>
+  </body>
+</html>

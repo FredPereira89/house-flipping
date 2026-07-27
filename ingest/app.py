@@ -38,6 +38,9 @@ def create_app() -> Flask:
     from ingest.routes_detail import bp as detail_bp
     app.register_blueprint(detail_bp)
 
+    from ingest.routes_baselines import bp as baselines_bp
+    app.register_blueprint(baselines_bp)
+
     @app.post("/ingest/listings")
     @require_secret
     def ingest_listings():
