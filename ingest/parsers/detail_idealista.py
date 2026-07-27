@@ -15,8 +15,15 @@ def parse_detail(url: str, html: str) -> dict:
     """
     soup = BeautifulSoup(html, "html.parser")
 
-    desc_tag = soup.select_one(".comment p")
-    description = desc_tag.get_text(separator="\n").strip() if desc_tag else ""
+    # select_one(".comment") -- not ".comment p" -- and get_text() over the
+    # whole container, matching how the search parsers extract text (see
+    # ingest/parsers/idealista.py's `article.get_text(...)`). A multi-
+    # paragraph description has one <p> per paragraph inside .comment;
+    # selecting only the first <p> would silently drop every paragraph
+    # after it, which is exactly the kind of loss the "parsers must be
+    # lossless" convention (HANDOFF.md §9) exists to prevent.
+    comment_el = soup.select_one(".comment")
+    description = comment_el.get_text(separator="\n").strip() if comment_el else ""
 
     # Idealista detail pages serve photos through <picture><img> with the
     # real (often larger) URL in data-src and a low-res placeholder in src.

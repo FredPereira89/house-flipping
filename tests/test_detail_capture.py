@@ -22,6 +22,15 @@ def test_extracts_description_from_comment_p(parsed):
     assert "Apartamento T3 remodelado" in parsed["description"]
 
 
+def test_description_extraction_is_lossless_across_multiple_paragraphs(parsed):
+    """Regression test: select_one(".comment p") would only ever return the
+    FIRST <p>, silently dropping every paragraph after it. The fixture's
+    .comment block has two <p> elements -- both must survive."""
+    assert "Apartamento T3 remodelado" in parsed["description"]
+    assert "Segundo paragrafo" in parsed["description"]
+    assert "totalmente renovado em 2023" in parsed["description"]
+
+
 def test_prefers_data_src_over_src(parsed):
     assert (
         "https://img4.idealista.pt/blur/WEB_LISTING-M/0/id.pro.pt.image.master/aa/bb/cc/full.jpg"
@@ -330,3 +339,95 @@ def test_retry_after_partial_success_does_not_duplicate_photos(
         "SELECT count(*) AS n FROM lead_photos WHERE lead_id = %s", (lead_id,)
     ).fetchone()
     assert photos["n"] == 2
+
+
+def test_retry_reinserts_a_photo_whose_row_was_rolled_back_but_file_survived(
+    client, auth_headers, conn, clean_leads, monkeypatch, photo_cleanup
+):
+    """Reconstructs the actual failure precondition the file/DB-decoupling
+    fix exists for, rather than just two clean successful runs back to back.
+
+    Sequence:
+    1. First request: photo 0 downloads fine (its file is written to disk
+       and its lead_photos INSERT is issued, uncommitted). Photo 1's
+       download then raises, which propagates out of the whole
+       `with connection() as conn:` block in routes_detail and rolls back
+       the transaction -- including photo 0's INSERT -- before anything
+       commits. Photo 0's *file*, however, already made it to disk (file
+       I/O isn't transactional), so after this request: file exists,
+       DB row does not.
+    2. Second request (retry, as the queue's 'pending' state invites):
+       both downloads now succeed. Photo 0's file already exists, so it is
+       not re-downloaded -- but its row must still be (re-)inserted, since
+       `recorded_source_urls` is queried fresh from the DB each call and
+       correctly shows it as NOT recorded.
+
+    Against the pre-fix nesting (INSERT gated by the same
+    `if not os.path.exists(...)` check as the download, i.e. skipped
+    together), step 2 would skip photo 0 entirely -- file exists, so the
+    whole block including the INSERT is skipped -- permanently losing its
+    DB row even though the file sits right there on disk. This test was
+    run against that reverted nesting to confirm it fails there (asserts
+    below on `downloaded == 2` / `len(photos) == 2` would instead see 1),
+    and passes against the fix in routes_detail.py.
+    """
+    lead_id = _make_lead_and_queue_row(conn, URL)
+    conn.commit()
+    photo_dir = os.path.join("data", "photos", lead_id)
+    photo_cleanup.append(photo_dir)
+
+    call_count = {"n": 0}
+
+    def fail_on_second_image(img_url, timeout=None):
+        call_count["n"] += 1
+        if call_count["n"] == 2:
+            raise ConnectionError("simulated stall on the second image")
+        return FakeResponse(status_code=200)
+
+    monkeypatch.setattr("ingest.routes_detail.requests.get", fail_on_second_image)
+
+    first = client.post(
+        "/ingest/detail",
+        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8")},
+        headers=auth_headers,
+    )
+    assert first.status_code == 500
+
+    # Photo 0's file made it to disk before the second call raised...
+    photo_0_path = os.path.join(photo_dir, "0.jpg")
+    assert os.path.exists(photo_0_path)
+
+    # ...but the whole transaction -- including photo 0's INSERT -- rolled
+    # back, so nothing is recorded yet.
+    photos_after_failure = conn.execute(
+        "SELECT count(*) AS n FROM lead_photos WHERE lead_id = %s", (lead_id,)
+    ).fetchone()["n"]
+    assert photos_after_failure == 0
+
+    # Queue row was bumped back to 'pending' so a drain will retry it.
+    row = conn.execute(
+        "SELECT state FROM capture_queue WHERE url = %s", (URL,)
+    ).fetchone()
+    assert row["state"] == "pending"
+
+    # Retry: both images now download cleanly. Photo 0's file already
+    # exists on disk from the failed attempt above -- this is the crux of
+    # the test.
+    monkeypatch.setattr(
+        "ingest.routes_detail.requests.get",
+        lambda img_url, timeout=None: FakeResponse(status_code=200),
+    )
+    second = client.post(
+        "/ingest/detail",
+        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8")},
+        headers=auth_headers,
+    )
+    assert second.status_code == 200
+    # Both photos must be recorded now -- crucially, photo 0's row must
+    # have been (re-)inserted even though its file already existed on disk.
+    assert second.get_json()["downloaded"] == 2
+
+    photos = conn.execute(
+        "SELECT source_url FROM lead_photos WHERE lead_id = %s", (lead_id,)
+    ).fetchall()
+    assert len(photos) == 2

@@ -1,10 +1,14 @@
 <!--
 SYNTHETIC FIXTURE -- this is NOT a captured page. It is a minimal, hand-built
 HTML snippet that exercises the two selectors detail_idealista.parse_detail
-relies on (".comment p" for the description, "picture img" for photo URLs).
+relies on (".comment" for the description, "picture img" for photo URLs).
 Do not treat this as a real Idealista capture the way debug_page.html was
 once mistaken for one -- there is no genuine idealista.pt detail-page
 fixture in this repo yet.
+
+The .comment block deliberately has TWO <p> paragraphs (a real multi-
+paragraph Idealista description), to prove the parser doesn't silently drop
+everything after the first one.
 -->
 <html>
   <body>
@@ -13,6 +17,8 @@ fixture in this repo yet.
         <p>Apartamento T3 remodelado no centro de Lisboa.
 Excelente exposicao solar, junto a transportes publicos.
 Cozinha equipada, varanda e lugar de garagem.</p>
+        <p>Segundo paragrafo: possui elevador, arrumos na garagem e foi
+totalmente renovado em 2023.</p>
       </div>
     </div>
 
