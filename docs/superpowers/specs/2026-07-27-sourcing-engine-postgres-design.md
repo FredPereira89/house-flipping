@@ -107,10 +107,15 @@ enforced at the Prisma query layer.
 - `area_price_baselines` — `area_id`, `source`, `metric_type`, `period`
   (month), `price_per_sqm`, `sample_size`, `captured_at`. One row per
   area per source per month: a series, not a mutable number. Global.
+  Per D4 only `metric_type='asking'` rows are written in Slice 1; the
+  column exists so that the asking-vs-transaction distinction is explicit
+  in the data rather than an unstated assumption, and so a future
+  transaction source cannot be blended in by accident.
 - `org_area_overrides` — per-tenant manual override plus a note.
 - `saved_searches` — `portal`, `url`, `enabled`, `schedule`. Drives the
   extension; the schedule lives in the DB, not in JS.
-- `settings` — per-org discount threshold, max price, min typology.
+- `settings` — per-org discount threshold, max price, min typology, and
+  staleness threshold in days (default 3).
 - `disqualify_keywords` — per-org, categorised (rented / no-licence).
   Lifts the hardcoded lists out of `server.py:41-55`.
 
@@ -186,9 +191,9 @@ from outside, and the first two can persist unnoticed for weeks.
 |---|---|
 | Parse yields 0 items | Persist HTML to `captures/`, `capture_run.status=parse_empty`, raise **parser_health** alert |
 | Anti-bot challenge in HTML | `status=blocked`, distinct alert, never silently retried in a loop |
-| Area alias unmatched | Lead saved with `area_id=null` into a review queue, never dropped |
+| Area alias unmatched | Lead saved with `area_id=null`, never dropped. The "review queue" is not a separate table — it is the UI view filtering `sourcing_leads` on `area_id IS NULL`, where an area can be assigned by hand and the alias learned. |
 | Missing/zero m² | Lead saved, `price_per_sqm` null, excluded from evaluation rather than dividing by zero |
-| No run completed in N days | **Staleness alert** — catches Chrome simply not running |
+| No run completed within the staleness threshold (`settings`, default 3 days) | **Staleness alert** — catches Chrome simply not running |
 | Ingest unreachable | Extension retries with backoff, surfaces a badge, no alert |
 
 Rows three and four are behaviour changes: `idealista.py:50` and `:59`
