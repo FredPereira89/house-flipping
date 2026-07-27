@@ -1455,9 +1455,12 @@ git commit -m "feat: compute price per sqm and discount against area baseline"
 ### Task 9: Portal parsers with real HTML fixtures
 
 **Files:**
-- Create: `ingest/parsers/__init__.py`, `ingest/parsers/base.py`, `ingest/parsers/idealista.py`, `ingest/parsers/imovirtual.py`, `ingest/parsers/olx.py`
-- Create: `tests/fixtures/idealista_search.html` (+ imovirtual, olx)
+- Create: `ingest/parsers/__init__.py`, `ingest/parsers/base.py`, `ingest/parsers/idealista.py`
+- Create: `tests/fixtures/idealista_search.html`
 - Test: `tests/test_parsers_idealista.py`, `tests/test_parsers_router.py`
+
+**Scope:** Idealista only. imovirtual and olx are Task 13, because the plan
+specifies them in prose rather than code and they need their own fixtures.
 
 **Interfaces:**
 - Produces:
@@ -1476,9 +1479,9 @@ mkdir -p tests/fixtures
 cp debug_page.html tests/fixtures/idealista_search.html
 ```
 
-For imovirtual and olx, capture one search page each with the existing extension (or save from the browser) into `tests/fixtures/imovirtual_search.html` and `tests/fixtures/olx_search.html`.
-
-If `debug_page.html` turns out not to be an Idealista search page, capture a fresh one the same way. Confirm before proceeding:
+If `debug_page.html` turns out not to be an Idealista search page, report
+BLOCKED — capturing a fresh one needs a real browser session, which is a
+human step. Confirm before proceeding:
 
 ```bash
 grep -c 'article class="item' tests/fixtures/idealista_search.html
@@ -1667,15 +1670,15 @@ Expected: 5 passed. If `test_does_not_filter_by_price_or_typology` fails because
 
 ```python
 from typing import Callable
-from ingest.parsers import idealista, imovirtual, olx
+from ingest.parsers import idealista
 from ingest.parsers.base import ParsedListing
 
 Parser = Callable[[str, str], list[ParsedListing]]
 
+# Task 13 registers imovirtual and olx here. Do not add them now — their
+# modules do not exist yet and the import would fail.
 _ROUTES: list[tuple[str, Parser]] = [
     ("idealista.pt", idealista.parse),
-    ("imovirtual.com", imovirtual.parse),
-    ("olx.pt", olx.parse),
 ]
 
 
@@ -1701,21 +1704,15 @@ def test_returns_none_for_unknown_portal():
     assert get_parser("https://example.com/whatever") is None
 ```
 
-- [ ] **Step 8: Port imovirtual and olx the same way**
-
-Write `ingest/parsers/imovirtual.py` and `ingest/parsers/olx.py` following the identical shape: `parse(url, html) -> list[ParsedListing]`, no filtering, `logger.exception` per failed card. Base the selectors on `scrapers/imovirtual.py` and `scrapers/olx.py`, and derive `external_id` from the listing URL path.
-
-Write `tests/test_parsers_imovirtual.py` and `tests/test_parsers_olx.py` mirroring the five Idealista assertions against their fixtures.
-
-- [ ] **Step 9: Run the full parser suite**
+- [ ] **Step 8: Run the parser suite**
 
 ```bash
-pytest tests/test_parsers_idealista.py tests/test_parsers_imovirtual.py tests/test_parsers_olx.py tests/test_parsers_router.py -v
+pytest tests/test_parsers_idealista.py tests/test_parsers_router.py -v
 ```
 
-Expected: all pass.
+Expected: all pass. imovirtual and olx are Task 13.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add ingest/parsers tests/fixtures tests/test_parsers_*.py
@@ -2481,6 +2478,103 @@ Expected: clean database, migrations apply, seed runs, all tests pass.
 ```bash
 git add README.md
 git commit -m "docs: add local setup instructions"
+```
+
+---
+
+### Task 13: Imovirtual and OLX parsers
+
+**Files:**
+- Create: `ingest/parsers/imovirtual.py`, `ingest/parsers/olx.py`
+- Create: `tests/fixtures/imovirtual_search.html`, `tests/fixtures/olx_search.html`
+- Modify: `ingest/parsers/__init__.py`
+- Test: `tests/test_parsers_imovirtual.py`, `tests/test_parsers_olx.py`
+
+**Interfaces:**
+- Consumes: `ingest.parsers.base.ParsedListing`, the `_ROUTES` table in `ingest/parsers/__init__.py`
+- Produces: `imovirtual.parse(url, html) -> list[ParsedListing]`, `olx.parse(url, html) -> list[ParsedListing]`
+
+**Why this is separate:** unlike Idealista, the plan does not carry finished
+code for these. The implementer derives selectors from the existing
+`scrapers/imovirtual.py` and `scrapers/olx.py` and from the fixtures. This
+is judgment work, not transcription.
+
+**Reference material:** `scrapers/imovirtual.py` and `scrapers/olx.py` hold
+the working selectors from the current system. Note that Imovirtual is a
+React app that ships its data in a `__NEXT_DATA__` script tag — parsing that
+JSON is likely more robust than DOM selectors. `debug.py` and `debug_pw.py`
+record what was already learned about both sites.
+
+**Prerequisite (human step):** fixtures must exist before this task runs.
+Capture one search-results page from each portal with the existing
+extension or by saving the page from the browser, to
+`tests/fixtures/imovirtual_search.html` and `tests/fixtures/olx_search.html`.
+If either is missing, report BLOCKED rather than inventing a fixture.
+
+- [ ] **Step 1: Verify both fixtures exist and are non-trivial**
+
+```bash
+wc -c tests/fixtures/imovirtual_search.html tests/fixtures/olx_search.html
+```
+
+Expected: both well over 10,000 bytes. If either is missing or tiny,
+report BLOCKED.
+
+- [ ] **Step 2: Write the failing tests**
+
+Create `tests/test_parsers_imovirtual.py` and `tests/test_parsers_olx.py`,
+each mirroring the five assertions in `tests/test_parsers_idealista.py`:
+extracts listings; every listing has portal/external_id/url; external_id
+is stable and derived from the listing URL; prices are positive `Decimal`s;
+and extraction is lossless (no filtering by price or typology).
+
+Set `portal` to `"imovirtual"` and `"olx"` respectively, and assert the URL
+prefix matches each portal's domain.
+
+- [ ] **Step 3: Run them and watch them fail**
+
+```bash
+pytest tests/test_parsers_imovirtual.py tests/test_parsers_olx.py -v
+```
+
+Expected: FAIL — modules do not exist.
+
+- [ ] **Step 4: Implement both parsers**
+
+Follow the exact shape of `ingest/parsers/idealista.py`: module-level
+`logger`, a `_to_decimal` helper, `parse(url, html) -> list[ParsedListing]`,
+a `try`/`except` around each card with `logger.exception`, and a final
+`logger.info` reporting the count. **No filtering by price, typology or
+location** — extraction is lossless, exactly as in Task 9.
+
+- [ ] **Step 5: Run the tests**
+
+```bash
+pytest tests/test_parsers_imovirtual.py tests/test_parsers_olx.py -v
+```
+
+Expected: all pass.
+
+- [ ] **Step 6: Register both in the router**
+
+In `ingest/parsers/__init__.py`, import the two modules and add
+`("imovirtual.com", imovirtual.parse)` and `("olx.pt", olx.parse)` to
+`_ROUTES`. Extend `tests/test_parsers_router.py` with a routing assertion
+for each.
+
+- [ ] **Step 7: Run the whole suite**
+
+```bash
+pytest -v
+```
+
+Expected: all green.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add ingest/parsers tests/fixtures tests/test_parsers_imovirtual.py tests/test_parsers_olx.py tests/test_parsers_router.py
+git commit -m "feat: add Imovirtual and OLX parsers"
 ```
 
 ---
