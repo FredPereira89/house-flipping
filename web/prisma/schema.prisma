@@ -94,14 +94,7 @@ model Area {
 
   baselines AreaPriceBaseline[]
   overrides OrgAreaOverride[]
-  // NOTE(task-2 deviation): brief's schema also listed `leads SourcingLead[]` here,
-  // but no SourcingLead model is defined anywhere in the task-2 brief (single grep hit,
-  // in this line only), and the brief's own "Produces" list only names 11 tables with
-  // no sourcing-leads table. Including the relation makes `prisma validate` reject the
-  // whole schema ("Type SourcingLead ... neither a built-in type nor ... a model you
-  // defined"), blocking migrate entirely. This field is virtual on the Area side (no
-  // column/FK on `areas`), so omitting it has zero DDL impact. Deferred to whichever
-  // future task introduces the SourcingLead model.
+  leads     SourcingLead[]
 
   @@index([municipality])
   @@map("areas")
@@ -192,4 +185,111 @@ model DisqualifyKeyword {
   @@unique([orgId, keyword])
   @@index([orgId, enabled])
   @@map("disqualify_keywords")
+}
+
+model SourcingLead {
+  id              String    @id @default(cuid())
+  orgId           String    @map("org_id")
+  portal          String
+  externalId      String    @map("external_id")
+  url             String
+  title           String?
+  description     String?
+  price           Decimal?  @db.Decimal(12, 2)
+  currency        String    @default("EUR")
+  areaSqmGross    Decimal?  @map("area_sqm_gross") @db.Decimal(10, 2)
+  areaSqmUseful   Decimal?  @map("area_sqm_useful") @db.Decimal(10, 2)
+  landAreaSqm     Decimal?  @map("land_area_sqm") @db.Decimal(10, 2)
+  typology        Int?
+  areaId          String?   @map("area_id")
+  rawLocationText String?   @map("raw_location_text")
+  latitude        Decimal?  @db.Decimal(9, 6)
+  longitude       Decimal?  @db.Decimal(9, 6)
+  imageUrls       Json      @default("[]") @map("image_urls")
+  pricePerSqmGross  Decimal? @map("price_per_sqm_gross") @db.Decimal(12, 2)
+  pricePerSqmUseful Decimal? @map("price_per_sqm_useful") @db.Decimal(12, 2)
+  discountPct     Decimal?  @map("discount_pct") @db.Decimal(6, 2)
+  status          String    @default("evaluating")
+  disqualifiedAt     DateTime? @map("disqualified_at")
+  disqualifyReason   String?   @map("disqualify_reason")
+  firstSeenAt     DateTime  @map("first_seen_at")
+  lastSeenAt      DateTime  @map("last_seen_at")
+  raw             Json?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  area         Area?              @relation(fields: [areaId], references: [id])
+  priceHistory LeadPriceHistory[]
+  tags         LeadTag[]
+
+  @@unique([orgId, portal, externalId])
+  @@index([orgId, status])
+  @@index([orgId, areaId])
+  @@index([areaId])
+  @@map("sourcing_leads")
+}
+
+model LeadPriceHistory {
+  id         String   @id @default(cuid())
+  leadId     String   @map("lead_id")
+  price      Decimal  @db.Decimal(12, 2)
+  currency   String   @default("EUR")
+  observedAt DateTime @map("observed_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  lead SourcingLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, observedAt])
+  @@map("lead_price_history")
+}
+
+model LeadTag {
+  id        String   @id @default(cuid())
+  leadId    String   @map("lead_id")
+  tag       String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  lead SourcingLead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([leadId, tag])
+  @@map("lead_tags")
+}
+
+model Alert {
+  id          String    @id @default(cuid())
+  orgId       String    @map("org_id")
+  type        String
+  severity    String    @default("info")
+  entityType  String?   @map("entity_type")
+  entityId    String?   @map("entity_id")
+  message     String
+  payload     Json?
+  resolvedAt  DateTime? @map("resolved_at")
+  dismissedAt DateTime? @map("dismissed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([orgId, type, resolvedAt])
+  @@map("alerts")
+}
+
+model CaptureRun {
+  id           String    @id @default(cuid())
+  orgId        String    @map("org_id")
+  portal       String?
+  url          String
+  htmlBytes    Int       @map("html_bytes")
+  itemsParsed  Int       @default(0) @map("items_parsed")
+  itemsNew     Int       @default(0) @map("items_new")
+  status       String
+  error        String?
+  capturedAt   DateTime  @map("captured_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@index([orgId, createdAt])
+  @@index([orgId, status])
+  @@map("capture_runs")
 }
