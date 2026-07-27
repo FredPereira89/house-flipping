@@ -1,8 +1,8 @@
 # Handoff — House Flipping Pipeline Platform
 
 **Written:** 2026-07-27
-**For:** Claude Code
-**Status:** ALL 13 Tasks in Plan 1 (Slice 1) are COMPLETE. Plan 2 (Slice 1) Tasks 0 and 1 are COMPLETE. Tasks 2-4 remain.
+**For:** Next Agent / Developer
+**Status:** ALL 13 Tasks in Plan 1 (Slice 1) are COMPLETE. All Tasks in Plan 2 (Slice 1) are COMPLETE. Plan 3 is designed and ready for implementation.
 
 Read this file top to bottom before touching anything. It is the map.
 
@@ -57,7 +57,7 @@ most important section of this document.
 |---|---|---|
 | **Design spec (Slice 1)** | `docs/superpowers/specs/2026-07-27-sourcing-engine-postgres-design.md` | Approved by the user. 13 numbered decisions with rationale. **This governs.** |
 | **Plan 1 (executed)** | `docs/superpowers/plans/2026-07-27-slice1-foundation-and-listing-ingest.md` | 13 tasks, all 13 are COMPLETE. |
-| **Plan 2 (current)** | `docs/superpowers/plans/2026-07-27-slice1-plan2-capture.md` | Tasks 0 & 1 COMPLETE. Tasks 2, 3, and 4 pending implementation by Claude Code. |
+| **Plan 2 (executed)** | `docs/superpowers/plans/2026-07-27-slice1-plan2-capture.md` | All tasks COMPLETE. |
 | Original prompt | `house-flip-app-claude-code-prompt.md` | Historical. Superseded where it conflicts with the spec. |
 
 If the spec and the original prompt disagree, **the spec wins**.
@@ -66,18 +66,17 @@ If the spec and the original prompt disagree, **the spec wins**.
 
 ## 4. Current state
 
-**Next Steps for Claude Code:**
-Before you write any code, you MUST:
-1. **Review everything that Antigravity built in Plan 1 and Plan 2** (the Prisma models, the Python `ingest` app, endpoints, area matcher, queue repositories, and HTML parsers) so you understand the architecture, data models, and conventions.
-2. **Review the Plan 2 document** (`docs/superpowers/plans/2026-07-27-slice1-plan2-capture.md`). Tasks 0 and 1 are already completed. 
-3. **Begin implementing Plan 2 (Tasks 2, 3, 4)** using Test-Driven Development.
+**Next Steps:**
+1. **Claude Review for Plan 3:** Before beginning implementation, Claude must review the updated plan at `docs/superpowers/plans/2026-07-27-slice1-plan3-webapp.md`. The plan has been updated with modern web standards, but requires Claude's final approval.
+2. **Implement Plan 3 (Next.js web app):** Once Claude approves the plan, proceed with implementing the Next.js web app following the plan.
+2. **Review Open Questions:** Section 7 has open questions that the user still needs to decide on, especially regarding AI modules and ARV.
 
-**Important feedback for Tasks 2, 3, and 4 from Antigravity:**
-* **Tab Leakage (Stuck Tabs):** In `background.js`, you should add a fallback timeout (e.g. 30-60s) to forcibly close a tab if it gets stuck (e.g. anti-bot block) and never returns the `CAPTURE_DONE` message.
-* **Concurrency in extension:** Ensure that `chrome.alarms` doesn't stack concurrent runs if one loop takes too long to drain the queue. Use a locking variable.
-* **Flask Blocking:** The `/ingest/detail` endpoint downloads multiple high-res photos synchronously. Acknowledge that this may lead to long TTFB for the Chrome extension, or consider enqueuing photo downloads if it becomes a problem.
-* **Storage:** Ensure `data/photos` or `data/` is added to `.gitignore` so huge images aren't committed to the repository.
-* **Area Slug Matching:** The idealista baselines URL slug matching assumes that the Idealista slug perfectly matches the database `slug` (e.g., `lisboa`). Verify the seed data slugs match the idealista ones.
+**Done in Plan 2 (All 5/5 tasks):**
+- **Task 0** — Database Schema Update (`CaptureQueue` and `LeadPhoto` models).
+- **Task 1** — Enqueue `hot_lead`s and Orchestration Endpoints (`/ingest/searches`, `/ingest/capture-queue`).
+- **Task 2** — The Self-Driving Chrome Extension (background.js MV3 worker, watchdog, capture loop).
+- **Task 3** — Detail Page Parser & High-Res Images.
+- **Task 4** — Idealista Market Baselines Ingest.
 
 **Done in Plan 1 (All 13/13 tasks):**
 - **Task 1** — Postgres 18 in Docker, `pg_trgm` + `unaccent`, connection test passing.
@@ -225,8 +224,8 @@ Plan 1 is roughly 15–20% of the total build.
 | | Scope | Status |
 |---|---|---|
 | Slice 1 · Plan 1 | DB, ingest service, evaluation, CSV migration | COMPLETE |
-| Slice 1 · Plan 2 | Self-driving extension, `capture_queue`, detail capture, idealista baselines | In Progress (Tasks 0 & 1 Complete, 2-4 pending) |
-| Slice 1 · Plan 3 | Next.js web app — leads, triage, alerts, admin | Designed in the spec, not planned |
+| Slice 1 · Plan 2 | Self-driving extension, `capture_queue`, detail capture, idealista baselines | COMPLETE |
+| Slice 1 · Plan 3 | Next.js web app — leads, triage, alerts, admin | Planned and reviewed. Ready for implementation. |
 | Slice 2 | Projects, property details, budgets, expenses, tasks, contractors, documents | Not designed |
 | Slice 3 | AI evaluation — provider interface, vision condition scoring, cost matrix, ARV | Not designed |
 | Slice 4 | Contractor quote parsing, rubric categorisation, overcapitalisation alerts | Not designed |
