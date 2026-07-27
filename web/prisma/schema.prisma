@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Org {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users              User[]
+  settings           Settings?
+  savedSearches      SavedSearch[]
+  disqualifyKeywords DisqualifyKeyword[]
+  areaOverrides      OrgAreaOverride[]
+
+  @@map("orgs")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  orgId         String    @map("org_id")
+  email         String    @unique
+  passwordHash  String?   @map("password_hash")
+  name          String?
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  role          String    @default("admin")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  org      Org       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  accounts Account[]
+  sessions Session[]
+
+  @@index([orgId])
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+/// Global reference data — deliberately NOT org-scoped (D9).
+model Area {
+  id           String   @id @default(cuid())
+  name         String
+  municipality String
+  slug         String   @unique
+  aliases      String[]
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  baselines AreaPriceBaseline[]
+  overrides OrgAreaOverride[]
+  // NOTE(task-2 deviation): brief's schema also listed `leads SourcingLead[]` here,
+  // but no SourcingLead model is defined anywhere in the task-2 brief (single grep hit,
+  // in this line only), and the brief's own "Produces" list only names 11 tables with
+  // no sourcing-leads table. Including the relation makes `prisma validate` reject the
+  // whole schema ("Type SourcingLead ... neither a built-in type nor ... a model you
+  // defined"), blocking migrate entirely. This field is virtual on the Area side (no
+  // column/FK on `areas`), so omitting it has zero DDL impact. Deferred to whichever
+  // future task introduces the SourcingLead model.
+
+  @@index([municipality])
+  @@map("areas")
+}
+
+/// Global reference data (D9). Only metric_type='asking' is written (D4).
+model AreaPriceBaseline {
+  id           String   @id @default(cuid())
+  areaId       String   @map("area_id")
+  source       String
+  metricType   String   @map("metric_type")
+  period       DateTime @db.Date
+  pricePerSqm  Decimal  @map("price_per_sqm") @db.Decimal(12, 2)
+  currency     String   @default("EUR")
+  sampleSize   Int?     @map("sample_size")
+  capturedAt   DateTime @map("captured_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  area Area @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@unique([areaId, source, metricType, period])
+  @@index([areaId, period])
+  @@map("area_price_baselines")
+}
+
+model OrgAreaOverride {
+  id          String   @id @default(cuid())
+  orgId       String   @map("org_id")
+  areaId      String   @map("area_id")
+  pricePerSqm Decimal  @map("price_per_sqm") @db.Decimal(12, 2)
+  currency    String   @default("EUR")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  area Area @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, areaId])
+  @@map("org_area_overrides")
+}
+
+model SavedSearch {
+  id        String   @id @default(cuid())
+  orgId     String   @map("org_id")
+  portal    String
+  url       String
+  label     String?
+  enabled   Boolean  @default(true)
+  schedule  String   @default("0 */6 * * *")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, enabled])
+  @@map("saved_searches")
+}
+
+model Settings {
+  id                     String   @id @default(cuid())
+  orgId                  String   @unique @map("org_id")
+  discountThresholdPct   Decimal  @default(15.0) @map("discount_threshold_pct") @db.Decimal(5, 2)
+  maxPrice               Decimal  @default(250000) @map("max_price") @db.Decimal(12, 2)
+  minTypology            Int      @default(1) @map("min_typology")
+  stalenessThresholdDays Int      @default(3) @map("staleness_threshold_days")
+  currency               String   @default("EUR")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("settings")
+}
+
+model DisqualifyKeyword {
+  id        String   @id @default(cuid())
+  orgId     String   @map("org_id")
+  category  String
+  keyword   String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, keyword])
+  @@index([orgId, enabled])
+  @@map("disqualify_keywords")
+}
