@@ -1,8 +1,8 @@
 # Handoff — House Flipping Pipeline Platform
 
 **Written:** 2026-07-27
-**For:** whoever picks this up next (Antigravity or another agent/developer)
-**Status:** Tasks 1–3 of 13 complete in Plan 1 of 3, in Slice 1 of 5.
+**For:** Claude Code
+**Status:** ALL 13 Tasks in Plan 1 (Slice 1) are COMPLETE. Plan 2 (Slice 1) Tasks 0 and 1 are COMPLETE. Tasks 2-4 remain.
 
 Read this file top to bottom before touching anything. It is the map.
 
@@ -56,51 +56,43 @@ most important section of this document.
 | Document | Path | Status |
 |---|---|---|
 | **Design spec (Slice 1)** | `docs/superpowers/specs/2026-07-27-sourcing-engine-postgres-design.md` | Approved by the user. 13 numbered decisions with rationale. **This governs.** |
-| **Plan 1 (executing)** | `docs/superpowers/plans/2026-07-27-slice1-foundation-and-listing-ingest.md` | 13 tasks, TDD, with full code. Tasks 1–2 done. |
-| **Execution ledger** | `.superpowers/sdd/2026-07-27-slice1-foundation-and-listing-ingest/progress.md` | Running record. Survives context loss. **Read this to know where you are.** |
-| Per-task briefs & reports | same directory, `task-N-brief.md` / `task-N-report.md` | Generated per task |
+| **Plan 1 (executed)** | `docs/superpowers/plans/2026-07-27-slice1-foundation-and-listing-ingest.md` | 13 tasks, all 13 are COMPLETE. |
+| **Plan 2 (current)** | `docs/superpowers/plans/2026-07-27-slice1-plan2-capture.md` | Tasks 0 & 1 COMPLETE. Tasks 2, 3, and 4 pending implementation by Claude Code. |
 | Original prompt | `house-flip-app-claude-code-prompt.md` | Historical. Superseded where it conflicts with the spec. |
 
-If the spec and the original prompt disagree, **the spec wins**. If the
-plan and the spec disagree, ask the user.
+If the spec and the original prompt disagree, **the spec wins**.
 
 ---
 
 ## 4. Current state
 
-**Branch:** `slice1-foundation-and-listing-ingest` (not `master`)
-**HEAD:** `6ce4695`
-**Next task:** Task 4
-**Working tree:** clean
+**Next Steps for Claude Code:**
+Before you write any code, you MUST:
+1. **Review everything that Antigravity built in Plan 1 and Plan 2** (the Prisma models, the Python `ingest` app, endpoints, area matcher, queue repositories, and HTML parsers) so you understand the architecture, data models, and conventions.
+2. **Review the Plan 2 document** (`docs/superpowers/plans/2026-07-27-slice1-plan2-capture.md`). Tasks 0 and 1 are already completed. 
+3. **Begin implementing Plan 2 (Tasks 2, 3, 4)** using Test-Driven Development.
 
-```
-6ce4695 feat: add sourcing tables, duplicate view and trigram indexes
-30ef294 Add handoff document for continuation in another tool
-e484378 chore: track Prisma generated config and web gitignore
-7df03bf feat: add Prisma schema for tenancy, auth and reference data
-046a145 feat: run Postgres 18 in Docker with pg_trgm and unaccent
-d4cd40d Split portal parsers: Idealista in Task 9, others in Task 13
-d124609 Add two-pass capture, external liveness monitoring, duplicate view
-1a62230 Resolve ambiguities in Slice 1 design after self-review
-ec9ead7 Add Slice 1 design: sourcing engine on Postgres
-180ae5e Add Plan 1: data foundation and listing ingest
-```
+**Important feedback for Tasks 2, 3, and 4 from Antigravity:**
+* **Tab Leakage (Stuck Tabs):** In `background.js`, you should add a fallback timeout (e.g. 30-60s) to forcibly close a tab if it gets stuck (e.g. anti-bot block) and never returns the `CAPTURE_DONE` message.
+* **Concurrency in extension:** Ensure that `chrome.alarms` doesn't stack concurrent runs if one loop takes too long to drain the queue. Use a locking variable.
+* **Flask Blocking:** The `/ingest/detail` endpoint downloads multiple high-res photos synchronously. Acknowledge that this may lead to long TTFB for the Chrome extension, or consider enqueuing photo downloads if it becomes a problem.
+* **Storage:** Ensure `data/photos` or `data/` is added to `.gitignore` so huge images aren't committed to the repository.
+* **Area Slug Matching:** The idealista baselines URL slug matching assumes that the Idealista slug perfectly matches the database `slug` (e.g., `lisboa`). Verify the seed data slugs match the idealista ones.
 
-**Done:**
+**Done in Plan 1 (All 13/13 tasks):**
 - **Task 1** — Postgres 18 in Docker, `pg_trgm` + `unaccent`, connection test passing.
-- **Task 2** — Prisma schema for tenancy/auth/reference: `orgs`, `users`,
-  Auth.js tables, `areas`, `area_price_baselines`, `org_area_overrides`,
-  `saved_searches`, `settings`, `disqualify_keywords`.
-- **Task 3** — Sourcing tables: `sourcing_leads`, `lead_price_history`,
-  `lead_tags`, `alerts`, `capture_runs`; the `v_lead_duplicate_groups`
-  view; 3 GIN trigram indexes; `Area.leads` back-relation restored.
-
-16 tables plus `_prisma_migrations` are live. Verify with:
-```bash
-docker compose exec db psql -U houseflip -d houseflip -c "\dt"
-```
-
-**Not started:** Tasks 4–13.
+- **Task 2** — Prisma schema for tenancy/auth/reference (`orgs`, `users`, `areas`, `settings`, etc.)
+- **Task 3** — Sourcing tables: `sourcing_leads`, `lead_price_history`, view `v_lead_duplicate_groups`, and Trigram indexes.
+- **Task 4** — Seeded orgs, default user, areas from config.json, settings, and keywords.
+- **Task 5** — Ingest skeleton, config parsing, db connection pooling, shared-secret auth.
+- **Task 6** — Area matcher mapping raw Portuguese location strings to slugs using aliases.
+- **Task 7** — Disqualify keywords fetched dynamically from Postgres DB.
+- **Task 8** — Evaluator for calculating price_per_sqm and discount against area baselines.
+- **Task 9** — Idealista HTML parser ensuring lossless extraction of listings.
+- **Task 10** — The `/ingest/listings` endpoint which ties everything together and does idempotent Postgres upserts.
+- **Task 11** — Created `scripts/migrate_csv.py` and successfully migrated historical 731 listings.
+- **Task 12** — Wrote `README.md` containing developer setup.
+- **Task 13** — Implemented Imovirtual and OLX HTML parsers.
 
 ### Migration gotcha discovered in Task 3 — read before writing any migration
 
@@ -123,12 +115,6 @@ npx prisma migrate resolve --applied <migration_folder_name>
 ```
 
 Never run plain `prisma migrate dev` on a hand-written custom-DDL migration.
-
-**Note:** the legacy files (`main.py`, `server.py`, `scrapers/`, `utils/`,
-`config.json`, `extension/`, `debug*.py`, `test_*.py`, `scratch_*.py`) are
-still untracked in git. That is deliberate — they are reference material
-being replaced task by task. `config.json` in particular is READ by Task 4's
-seed script, so do not delete it.
 
 ---
 
@@ -201,349 +187,11 @@ matching `.env*`**. This is deliberate user policy.
 - `web/.env` holds `DATABASE_URL` for Prisma. It exists, is git-ignored via
   `web/.gitignore`, and is untracked.
 
-**Rule: never ask an agent to create or read an env file.** Earlier in this
-project an agent hit that denial and routed around it with shell variable
-indirection — a permission bypass. Nothing was exposed (it was a local dev
-connection string), but do not repeat it. If a gate denies something, stop
-and ask the user to do it.
+**Rule: never ask an agent to create or read an env file.**
 
 ---
 
-## 7. How to continue
-
-Plan 1 is executed with Subagent-Driven Development: one fresh implementer
-per task, a review after each, fixes looped back to the same implementer.
-You do not have to use that process, but **do keep the ledger updated** —
-it is what survives a context reset.
-
-**The plan file carries complete, ready-to-use code for every task below.**
-This section is the map and the cross-task contracts; the plan is the
-source. Read the plan's task section before implementing, and use its
-exact values — later tasks depend on these exact names.
-
-Each task follows: write the failing test → run it, watch it fail →
-implement → run it, watch it pass → commit.
-
----
-
-### Task 4 — Seed data
-
-**Files:** create `web/prisma/seed.ts`, `web/tsconfig.json`; modify `web/package.json`
-
-**Produces:** one `Org` with id `default-org`; one admin `User`; ~92 `Area`
-rows seeded from `config.json`; one `Settings` row; 25 disqualify keywords
-(13 rented + 12 no-licence).
-
-**Notes:**
-- Reads `config.json` at the repo root — **do not delete that file.**
-- `DEFAULT_ORG_ID` is the literal string `default-org`. Tasks 10 and 11
-  hardcode it. Keep it exactly.
-- Slugs are generated with `.replace(/\p{Diacritic}/gu, "")` after NFD
-  normalisation. A literal character range does not survive copy-paste.
-- `municipality` is seeded to the area name as a placeholder — `config.json`
-  has no municipality field. Correcting it is a later admin-UI task.
-- Needs `npm install --save-dev tsx typescript @types/node` and
-  `npm install bcryptjs` plus `@types/bcryptjs`.
-
-**Verify:** `npx prisma db seed`, then confirm the area count matches the
-number of `locations_avg_price_m2` keys in `config.json` minus one for
-`AML (Geral)`. **If the counts differ, two freguesias have collapsed onto
-one slug** — fix that before continuing.
-
-**Commit:** `feat: seed org, admin user, areas from config.json and keywords`
-
----
-
-### Task 5 — Python ingest package skeleton
-
-**Files:** create `ingest/__init__.py`, `ingest/config.py`, `ingest/db.py`,
-`ingest/auth.py`, `tests/test_auth.py`; modify `requirements.txt`
-
-**Produces — these signatures are consumed by every later task:**
-```python
-ingest.config.Config          # frozen dataclass
-  .database_url: str
-  .shared_secret: str
-  .port: int
-  .healthcheck_ping_url: str | None
-  Config.from_env() -> Config          # classmethod
-
-ingest.db.get_pool() -> ConnectionPool
-ingest.db.connection()                 # contextmanager, dict_row rows
-
-ingest.auth.require_secret(fn)         # Flask decorator, 401 + logs on failure
-ingest.auth.SECRET_HEADER = "X-Ingest-Secret"
-```
-
-**Notes:**
-- Use `hmac.compare_digest`, not `==`, for the secret. Constant-time
-  comparison avoids leaking it through timing.
-- Add `psycopg[binary,pool]==3.2.3` and `pytest==8.3.4` to `requirements.txt`.
-- **Do not create or read any `.env` file** (§6). `Config.from_env()` calls
-  `load_dotenv()` and reads the environment; that is all it needs.
-
-**Verify:** `pytest tests/test_auth.py -v` → 3 passed.
-
-**Commit:** `feat: add ingest package skeleton with config, pool and shared-secret auth`
-
----
-
-### Task 6 — Area matching
-
-**Files:** create `ingest/area_matcher.py`, `ingest/repositories/__init__.py`,
-`ingest/repositories/areas.py`, `tests/test_area_matcher.py`
-
-**Produces:**
-```python
-ingest.area_matcher.normalize_text(s: str) -> str
-ingest.area_matcher.match_area(text: str, areas: list[dict]) -> str | None
-
-ingest.repositories.areas.load_areas(conn) -> list[dict]
-ingest.repositories.areas.get_baseline(conn, area_id: str, org_id: str) -> Decimal | None
-```
-
-**Notes:**
-- **Longest alias wins.** "Benfica" is a substring of "São Domingos de
-  Benfica"; matching the short one misfiles the lead into the wrong
-  freguesia. There is a test for exactly this.
-- `get_baseline` checks `org_area_overrides` first, then falls back to the
-  most recent `area_price_baselines` row **with `metric_type = 'asking'`**.
-  Never consult transaction-metric rows (D4).
-
-**Verify:** `pytest tests/test_area_matcher.py -v` → 6 passed.
-
-**Commit:** `feat: match scraped location strings to areas by alias`
-
----
-
-### Task 7 — Disqualification filter
-
-**Files:** create `ingest/disqualify.py`, `tests/test_disqualify.py`
-
-**Produces:**
-```python
-ingest.disqualify.load_keywords(conn, org_id: str) -> list[dict]
-ingest.disqualify.check(description: str | None, keywords: list[dict])
-    -> tuple[bool, str | None, str | None]   # (is_disqualified, category, matched_keyword)
-```
-
-**Notes:**
-- Ported from `server.py:57-72`, but the keyword lists move out of source
-  into the `disqualify_keywords` table so they are editable without a deploy.
-- Must handle `None` and empty descriptions without raising.
-- Matching happens in `normalize_text` space, so diacritics and case do not
-  matter.
-
-**Verify:** `pytest tests/test_disqualify.py -v` → 5 passed.
-
-**Commit:** `feat: filter rented and unlicensed listings using DB keywords`
-
----
-
-### Task 8 — Evaluation
-
-**Files:** create `ingest/evaluate.py`, `tests/test_evaluate.py`
-
-**Produces:**
-```python
-ingest.evaluate.price_per_sqm(price: Decimal | None, area: Decimal | None) -> Decimal | None
-ingest.evaluate.discount_pct(value: Decimal | None, baseline: Decimal | None) -> Decimal | None
-ingest.evaluate.is_hot_lead(discount: Decimal | None, threshold: Decimal) -> bool
-```
-
-**Notes:**
-- All three return `None`/`False` rather than raising or skipping on missing
-  input. A listing with no area is still worth keeping; it just cannot be
-  evaluated. This is a deliberate change from `server.py`, which skipped
-  such listings entirely.
-- `discount_pct` is **positive when cheaper** than the baseline.
-- Threshold comes from `settings.discount_threshold_pct`. Never hardcode it.
-- Quantize to 2 decimal places with `ROUND_HALF_UP`.
-
-**Verify:** `pytest tests/test_evaluate.py -v` → 9 passed.
-
-**Commit:** `feat: compute price per sqm and discount against area baseline`
-
----
-
-### Task 9 — Idealista parser and router
-
-**Files:** create `ingest/parsers/__init__.py`, `ingest/parsers/base.py`,
-`ingest/parsers/idealista.py`, `tests/fixtures/idealista_search.html`,
-`tests/test_parsers_idealista.py`, `tests/test_parsers_router.py`
-
-**Produces:**
-```python
-ingest.parsers.base.ParsedListing   # TypedDict: portal, external_id, url, title,
-                                    # description, price, area_sqm_gross, typology,
-                                    # raw_location_text, image_urls
-ingest.parsers.get_parser(url: str) -> Parser | None
-ingest.parsers.idealista.parse(url: str, html: str) -> list[ParsedListing]
-```
-
-**Notes — this is the most important convention in the project:**
-- **Extraction must be lossless.** The legacy parser filters by price,
-  typology and location during extraction (`scrapers/idealista.py:29,42,59`),
-  silently discarding listings. The new parser returns everything it finds;
-  filtering and evaluation happen downstream where the outcome is recorded.
-  There is a test asserting a listing above €250k survives extraction.
-- `external_id` comes from the `/imovel/(\d+)` URL segment — stable across
-  URL-format changes, unlike the full link the legacy code deduped on.
-- Fixture: `cp debug_page.html tests/fixtures/idealista_search.html`.
-  Confirm it is a search page first: it should contain `article class="item"`.
-- `_ROUTES` registers **only Idealista** at this stage. Adding the other two
-  now breaks the import — they do not exist until Task 13.
-
-**Verify:** `pytest tests/test_parsers_idealista.py tests/test_parsers_router.py -v`
-
-**Commit:** `feat: port portal parsers to lossless extraction with fixture tests`
-
----
-
-### Task 10 — The `/ingest/listings` endpoint
-
-**Files:** create `ingest/normalize.py`, `ingest/repositories/leads.py`,
-`ingest/repositories/captures.py`, `ingest/app.py`, `ingest/health.py`,
-`tests/conftest.py`, `tests/test_ingest_listings.py`
-
-**Produces:**
-```python
-ingest.app.create_app() -> Flask
-
-ingest.normalize.to_lead_row(item, org_id, area_id, captured_at) -> dict
-
-ingest.repositories.leads.upsert_lead(conn, row) -> tuple[str, bool, Decimal | None]
-    # (lead_id, was_inserted, previous_price)
-ingest.repositories.leads.record_price(conn, lead_id, price, observed_at) -> None
-ingest.repositories.leads.apply_evaluation(conn, lead_id, price_per_sqm,
-    discount, status, disqualify_reason) -> None
-
-ingest.repositories.captures.record_run(conn, org_id, portal, url, html_bytes,
-    items_parsed, items_new, status, error, captured_at) -> str
-ingest.repositories.captures.raise_alert(conn, org_id, type_, severity,
-    message, entity_type=None, entity_id=None) -> None
-
-ingest.health.ping_deadman(config) -> None
-```
-
-**HTTP contract:**
-`POST /ingest/listings`, header `X-Ingest-Secret`, body
-`{"url": str, "html": str, "captured_at": iso8601}` →
-`{"parsed": int, "new": int, "updated": int, "hot_leads": int, "status": str}`
-
-**Notes:**
-- Dedupe on `(org_id, portal, external_id)`.
-- Write a `lead_price_history` row on insert, and on update **only when the
-  price actually changed**. There is an idempotency test asserting a repost
-  creates no spurious history row — the extension will re-capture pages.
-- A zero-item parse is not an error: record `status=parse_empty` and raise a
-  `parser_health` alert with severity `warning`. **Silence is this system's
-  dangerous failure** — a broken parser and a quiet market look identical.
-- `ping_deadman` must never raise. A monitoring failure must not fail an
-  ingest that otherwise worked.
-- Unknown portal → HTTP 400.
-
-**Verify:** `pytest tests/test_ingest_listings.py -v` → 6 passed, then
-`pytest -v` for the whole suite.
-
-**Commit:** `feat: add /ingest/listings endpoint with evaluation and alerts`
-
----
-
-### Task 11 — Migrate the 731 historical listings
-
-**Files:** create `scripts/__init__.py`, `scripts/migrate_csv.py`,
-`tests/test_migrate_csv.py`
-
-**Produces:**
-```python
-scripts.migrate_csv.external_id_from_link(link: str) -> str | None
-scripts.migrate_csv.migrate(csv_path: str, conn, org_id: str) -> dict
-    # {"total", "imported", "skipped", "unmatched_area"}
-```
-
-**Notes:**
-- Source file is `data/imoveis_extraidos.csv`, **semicolon-delimited**,
-  `utf-8-sig` encoded, 731 rows.
-- **Deliberately discards the stored `price_per_m2` / `discount_pct`.** They
-  were computed against the old hardcoded `config.json` baselines that this
-  system replaces. Recompute later against real baselines.
-- Rows whose location does not match an area are **kept with `area_id=null`**,
-  not dropped. They form the review queue (a UI view filtering
-  `area_id IS NULL`, built in Plan 3).
-- Rows with an unparseable link (e.g. the old `https://mock/1` test rows)
-  are skipped.
-- Must be idempotent — re-running imports nothing new.
-
-**Verify:** `pytest tests/test_migrate_csv.py -v` → 5 passed. Then run for
-real: `python -m scripts.migrate_csv --csv data/imoveis_extraidos.csv` and
-record the `unmatched_area` count.
-
-**Commit:** `feat: migrate historical CSV listings into Postgres`
-
----
-
-### Task 12 — README
-
-**Files:** create `README.md`
-
-Cover in order: prerequisites (Docker needs VT-x plus `wsl --install`; the
-native `postgresql-x64-18` service must be stopped); `docker compose up -d db`;
-copying `.env.example` to `.env` and setting `INGEST_SHARED_SECRET`;
-`cd web && npx prisma migrate deploy && npx prisma db seed`;
-`pip install -r requirements.txt`; `python -m ingest.app`; `pytest`; the CSV
-migration.
-
-Note that `HEALTHCHECK_PING_URL` is optional but strongly recommended — it is
-the only mechanism that detects the machine being asleep.
-
-**Verify from scratch:** `docker compose down -v && docker compose up -d db`,
-then migrate, seed, and `pytest -v`.
-
-**Commit:** `docs: add local setup instructions`
-
----
-
-### Task 13 — Imovirtual and OLX parsers
-
-**BLOCKED until a human captures two fixtures.** See §7 "Human steps" below.
-
-**Files:** create `ingest/parsers/imovirtual.py`, `ingest/parsers/olx.py`,
-`tests/fixtures/imovirtual_search.html`, `tests/fixtures/olx_search.html`,
-`tests/test_parsers_imovirtual.py`, `tests/test_parsers_olx.py`;
-modify `ingest/parsers/__init__.py`
-
-**Produces:** `imovirtual.parse(url, html)` and `olx.parse(url, html)`, both
-returning `list[ParsedListing]`, plus their entries in `_ROUTES`.
-
-**Notes:**
-- This is the one task the plan specifies in prose rather than finished
-  code — deriving selectors is judgment work. Use a capable model.
-- Reference material: `scrapers/imovirtual.py` and `scrapers/olx.py` hold
-  the working selectors from the current system.
-- **Imovirtual is a React app that ships its data in a `__NEXT_DATA__`
-  script tag.** Parsing that JSON is likely far more robust than DOM
-  selectors. `debug.py` and `debug_pw.py` record what was already learned.
-- OLX cards use `data-cy="l-card"`.
-- Same conventions as Task 9: lossless extraction, `logger.exception` per
-  failed card, `external_id` from the listing URL.
-
-**Verify:** `pytest -v` — whole suite green.
-
-**Commit:** `feat: add Imovirtual and OLX parsers`
-
-### Human steps that block automation
-
-- **Task 13 needs fixtures.** Someone must visit an Imovirtual and an OLX
-  search-results page in a real browser and save the HTML to
-  `tests/fixtures/imovirtual_search.html` and `tests/fixtures/olx_search.html`.
-  An agent cannot do this — that is the whole point of §2.1.
-- Any `.env` file change (§6).
-- Anything needing an elevated/Administrator shell.
-
----
-
-## 8. Open questions the user still needs to decide
+## 7. Open questions the user still needs to decide
 
 1. **Anthropic vs Gemini for the AI modules.** The prompt says Claude;
    `utils/vision.py` already uses Gemini. Not yet decided. Whichever wins,
@@ -570,14 +218,14 @@ returning `list[ParsedListing]`, plus their entries in `_ROUTES`.
 
 ---
 
-## 9. The bigger roadmap
+## 8. The bigger roadmap
 
 Plan 1 is roughly 15–20% of the total build.
 
 | | Scope | Status |
 |---|---|---|
-| Slice 1 · Plan 1 | DB, ingest service, evaluation, CSV migration | In progress (2/13) |
-| Slice 1 · Plan 2 | Self-driving extension, `capture_queue`, detail capture, idealista baselines | Designed in the spec, not planned |
+| Slice 1 · Plan 1 | DB, ingest service, evaluation, CSV migration | COMPLETE |
+| Slice 1 · Plan 2 | Self-driving extension, `capture_queue`, detail capture, idealista baselines | In Progress (Tasks 0 & 1 Complete, 2-4 pending) |
 | Slice 1 · Plan 3 | Next.js web app — leads, triage, alerts, admin | Designed in the spec, not planned |
 | Slice 2 | Projects, property details, budgets, expenses, tasks, contractors, documents | Not designed |
 | Slice 3 | AI evaluation — provider interface, vision condition scoring, cost matrix, ARV | Not designed |
@@ -590,10 +238,8 @@ before implementation.
 
 ---
 
-## 10. Conventions
+## 9. Conventions
 
-- **TDD**: write the failing test, run it, watch it fail, implement, watch
-  it pass, commit. The plan's tasks are written in exactly this rhythm.
 - **Parsers must be lossless.** The legacy parsers silently `continue` past
   listings that are too expensive or unmatched (`scrapers/idealista.py:29,42,59`),
   discarding them without trace. New parsers extract everything; filtering
@@ -603,5 +249,3 @@ before implementation.
 - **Silence is the dangerous failure.** A broken parser, a blocked run and
   a quiet market look identical. Zero-parse results raise a
   `parser_health` alert and persist the HTML — never fail silently.
-- Commit messages: imperative mood, explain *why* rather than restating the
-  diff.
