@@ -1,202 +1,300 @@
 // Houseflip Sourcing Engine - background service worker (Manifest V3)
 //
 // Drives capture entirely off chrome.alarms: no manual toggle decides
-// whether capture happens (see HANDOFF.md D5). Each alarm tick drains the
-// capture queue first (detail/baseline jobs enqueued by the ingest service),
-// then, if the queue is empty, advances one saved search by one page.
+// whether capture happens (see HANDOFF.md D5). Each alarm tick starts the
+// next capture job -- a capture-queue job (detail/baseline) if one is
+// pending, otherwise one saved search -- and a second, independent alarm
+// reclaims tabs whose job has gone stale.
 //
-// A "job" here corresponds to one background tab. For kind: 'search' jobs
-// the tab may navigate through several result pages (content.js drives the
-// per-portal "next page" pagination) before it finally reports
-// CAPTURE_DONE; for kind: 'detail' / 'baseline' jobs the tab reports
-// CAPTURE_DONE right after its single POST.
+// MV3 service workers are routinely evicted after a short idle period, and
+// a paginated search job's gaps between check-ins (3-7s content-script
+// delay + page navigation/load, per page) are easily long enough to trigger
+// that. So job state is NOT kept as an in-memory Map (that was the bug in
+// the first version of this file: a `setTimeout` watchdog and a
+// resolve()-holding Promise both die silently when the worker is evicted,
+// leaking the tab and starving the queue forever). Instead:
+//   - The one active job's state (tabId, kind, page count, timestamps) is
+//     persisted to chrome.storage.local (ACTIVE_JOB_KEY) after every
+//     check-in, so a freshly-woken worker can pick up exactly where the
+//     previous instance left off.
+//   - The stale-tab watchdog is a second recurring chrome.alarms alarm
+//     (WATCHDOG_ALARM), not a setTimeout. Alarms are persisted by Chrome
+//     itself and keep firing -- and keep waking the service worker -- even
+//     across an eviction+restart or a full browser restart, which a
+//     setTimeout cannot do.
 
 const API_BASE = "http://localhost:5000";
 const DEFAULT_SECRET = "dev-secret"; // documented first-run default only; real
 // value lives in chrome.storage.local.ingestSecret and can be changed from
 // the popup without touching source.
 
-const ALARM_NAME = "capture-loop";
-const ALARM_PERIOD_MINUTES = 2;
+const CAPTURE_ALARM = "capture-loop";
+const CAPTURE_PERIOD_MINUTES = 2;
 
-// Per-page-load watchdog. Reset every time a content script for the current
-// job's tab checks in (GET_JOB_KIND), so a long paginated search does not
-// get killed mid-flight -- only a tab that goes silent (anti-bot block,
-// crash, navigation to a page the extension has no host permission for,
-// etc.) gets force-closed.
-const TAB_WATCHDOG_MS = 45000;
+const WATCHDOG_ALARM = "job-watchdog";
+const WATCHDOG_PERIOD_MINUTES = 1; // chrome.alarms can't reliably fire more
+// often than this, so that's the granularity at which staleness is checked.
+
+// A job is considered stalled (anti-bot block, crash, navigation to a page
+// outside host_permissions, tab closed from under us, etc.) if content.js
+// hasn't checked in for this long. This is deliberately a bit looser than a
+// setTimeout-based "30-60s" would give you, in exchange for a watchdog that
+// actually survives a service-worker restart mid-job -- see checkWatchdog().
+const STALE_JOB_MS = 90 * 1000;
 
 // Hard cap on pages processed per search job, so a portal that never runs
-// out of "next page" links can't keep one tab alive forever.
+// out of "next page" links can't keep one tab alive forever. Persisted
+// alongside pageCount in ACTIVE_JOB_KEY, so the cap holds even if the
+// worker restarts mid-job.
 const MAX_SEARCH_PAGES = 10;
 
-// tabId -> { kind, pageCount, resolve, timeoutId }
-const pendingJobs = new Map();
+// chrome.storage.local key holding the single in-flight job, or absent if
+// none. Shape: { tabId, kind, pageCount, jobUrl, startedAt, lastCheckinAt }
+// (plain JSON -- no closures/Promises, unlike the old in-memory Map, so it
+// actually survives being written/read across a worker restart).
+const ACTIVE_JOB_KEY = "activeJob";
 
-// Prevents chrome.alarms from starting a second drain of the queue/searches
-// while a previous run is still in flight (e.g. a slow paginated search
-// still running when the next 2-minute tick fires).
-let captureLoopRunning = false;
+// --- Pure logic (exported for the Node test; safe without chrome.*) ------
 
-chrome.runtime.onInstalled.addListener(async () => {
-  const { ingestSecret } = await chrome.storage.local.get("ingestSecret");
-  if (!ingestSecret) {
-    await chrome.storage.local.set({ ingestSecret: DEFAULT_SECRET });
-  }
-  chrome.alarms.create(ALARM_NAME, { periodInMinutes: ALARM_PERIOD_MINUTES });
-});
-
-chrome.runtime.onStartup.addListener(() => {
-  // chrome.alarms.create is idempotent by name; re-arm in case the alarm
-  // was lost across a browser restart.
-  chrome.alarms.create(ALARM_NAME, { periodInMinutes: ALARM_PERIOD_MINUTES });
-});
-
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === ALARM_NAME) {
-    runCaptureLoop();
-  }
-});
-
-async function getSecret() {
-  const { ingestSecret } = await chrome.storage.local.get("ingestSecret");
-  return ingestSecret || DEFAULT_SECRET;
+function isJobStale(lastCheckinIso, nowMs, staleMs) {
+  const lastCheckin = Date.parse(lastCheckinIso);
+  if (Number.isNaN(lastCheckin)) return true; // malformed/missing timestamp: treat as stale rather than leak the tab forever
+  return nowMs - lastCheckin >= staleMs;
 }
 
-async function runCaptureLoop() {
-  if (captureLoopRunning) {
-    console.log("[capture-loop] previous run still in progress; skipping this tick");
-    return;
-  }
-  captureLoopRunning = true;
-  try {
-    await drainQueueThenSearches();
-    await chrome.storage.local.set({
-      lastRunAt: new Date().toISOString(),
-      lastRunStatus: "ok",
-    });
-  } catch (err) {
-    console.error("[capture-loop] run failed", err);
-    await chrome.storage.local.set({
-      lastRunAt: new Date().toISOString(),
-      lastRunStatus: `error: ${err && err.message ? err.message : String(err)}`,
-    });
-  } finally {
-    captureLoopRunning = false;
-  }
-}
+// --- Browser glue ----------------------------------------------------------
+// Guarded so `require`-ing this file under Node (for the pure-logic test)
+// doesn't try to touch chrome.* and throw.
+if (typeof chrome !== "undefined" && chrome.runtime && chrome.alarms) {
+  // In-memory fast-path lock only, to stop two overlapping calls within the
+  // *same* live worker instance from both starting a job at once. This is
+  // NOT the cross-restart guarantee -- that's ACTIVE_JOB_KEY (checked before
+  // this flag even matters) plus the watchdog alarm. If the worker restarts,
+  // this flag simply resets to false, which is fine: the persisted job
+  // state is what actually prevents opening a second tab for the same slot.
+  let captureLoopRunning = false;
 
-async function drainQueueThenSearches() {
-  const secret = await getSecret();
+  chrome.runtime.onInstalled.addListener(handleInit);
+  chrome.runtime.onStartup.addListener(handleInit);
 
-  const queueRes = await fetch(`${API_BASE}/ingest/capture-queue`, {
-    headers: { "X-Ingest-Secret": secret },
-  });
-  if (!queueRes.ok) {
-    throw new Error(`GET /ingest/capture-queue failed: ${queueRes.status}`);
-  }
-  const { jobs } = await queueRes.json();
-  await chrome.storage.local.set({ lastQueueDepth: jobs ? jobs.length : 0 });
-
-  if (jobs && jobs.length > 0) {
-    for (const job of jobs) {
-      await processJob({ url: job.url, kind: job.kind });
+  async function handleInit() {
+    const { ingestSecret } = await chrome.storage.local.get("ingestSecret");
+    if (!ingestSecret) {
+      await chrome.storage.local.set({ ingestSecret: DEFAULT_SECRET });
     }
-    return; // Prioritize queued detail/baseline captures over search polling.
+    chrome.alarms.create(CAPTURE_ALARM, { periodInMinutes: CAPTURE_PERIOD_MINUTES });
+    chrome.alarms.create(WATCHDOG_ALARM, { periodInMinutes: WATCHDOG_PERIOD_MINUTES });
+    // Don't wait for the next scheduled watchdog tick to notice a job that
+    // was already stale when the browser/worker (re)started.
+    await checkWatchdog();
   }
 
-  const searchesRes = await fetch(`${API_BASE}/ingest/searches`, {
-    headers: { "X-Ingest-Secret": secret },
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === CAPTURE_ALARM) {
+      runCaptureLoop();
+    } else if (alarm.name === WATCHDOG_ALARM) {
+      checkWatchdog();
+    }
   });
-  if (!searchesRes.ok) {
-    throw new Error(`GET /ingest/searches failed: ${searchesRes.status}`);
-  }
-  const { searches } = await searchesRes.json();
 
-  if (searches && searches.length > 0) {
-    // One search per alarm tick, so at most one capture tab is ever open at
-    // a time and each portal gets a slow, humanlike cadence overall.
-    await processJob({ url: searches[0].url, kind: "search" });
-  }
-}
-
-function cleanupJob(tabId) {
-  const entry = pendingJobs.get(tabId);
-  if (!entry) return null;
-  pendingJobs.delete(tabId);
-  clearTimeout(entry.timeoutId);
-  return entry;
-}
-
-function finishJob(tabId, reason) {
-  const entry = cleanupJob(tabId);
-  if (!entry) return;
-  chrome.tabs.remove(tabId).catch(() => {});
-  entry.resolve(reason);
-}
-
-function armWatchdog(tabId) {
-  const entry = pendingJobs.get(tabId);
-  if (!entry) return;
-  clearTimeout(entry.timeoutId);
-  entry.timeoutId = setTimeout(() => finishJob(tabId, "timeout"), TAB_WATCHDOG_MS);
-}
-
-async function processJob(job) {
-  let tab;
-  try {
-    tab = await chrome.tabs.create({ url: job.url, active: false });
-  } catch (err) {
-    console.error("Failed to open capture tab for", job.url, err);
-    return "tab_create_failed";
+  async function getSecret() {
+    const { ingestSecret } = await chrome.storage.local.get("ingestSecret");
+    return ingestSecret || DEFAULT_SECRET;
   }
 
-  const tabId = tab.id;
-  return new Promise((resolve) => {
-    pendingJobs.set(tabId, {
+  async function getActiveJob() {
+    const { [ACTIVE_JOB_KEY]: job } = await chrome.storage.local.get(ACTIVE_JOB_KEY);
+    return job || null;
+  }
+
+  async function setActiveJob(job) {
+    await chrome.storage.local.set({ [ACTIVE_JOB_KEY]: job });
+  }
+
+  async function clearActiveJob() {
+    await chrome.storage.local.remove(ACTIVE_JOB_KEY);
+  }
+
+  async function closeTab(tabId) {
+    try {
+      await chrome.tabs.remove(tabId);
+    } catch (err) {
+      // Tab may already be gone (user closed it, browser reclaimed it,
+      // etc.) -- nothing left to do.
+    }
+  }
+
+  // The recurring, alarm-driven replacement for the old setTimeout
+  // watchdog. Runs every WATCHDOG_PERIOD_MINUTES regardless of whether this
+  // particular worker instance is the one that started the active job --
+  // chrome.alarms wakes a fresh worker to run this exactly the same as a
+  // long-lived one.
+  async function checkWatchdog() {
+    const job = await getActiveJob();
+    if (!job) return;
+
+    if (!isJobStale(job.lastCheckinAt, Date.now(), STALE_JOB_MS)) return;
+
+    console.warn(
+      `[job-watchdog] tab ${job.tabId} stale (kind=${job.kind}, page ${job.pageCount}, ` +
+        `last check-in ${job.lastCheckinAt}); force-closing`,
+    );
+    await clearActiveJob();
+    await closeTab(job.tabId);
+    await chrome.storage.local.set({
+      lastRunAt: new Date().toISOString(),
+      lastRunStatus: `watchdog: force-closed stale tab ${job.tabId} (kind=${job.kind}, page ${job.pageCount})`,
+    });
+  }
+
+  async function runCaptureLoop() {
+    if (captureLoopRunning) {
+      console.log("[capture-loop] already running in this worker instance; skipping tick");
+      return;
+    }
+    captureLoopRunning = true;
+    try {
+      const existing = await getActiveJob();
+      if (existing) {
+        // A job is already in flight -- either started earlier in this
+        // tick's predecessor or by a worker instance that has since been
+        // evicted. Don't open a second tab for it; checkWatchdog() (driven
+        // by its own alarm) is responsible for reclaiming it if it's gone
+        // stale.
+        await chrome.storage.local.set({
+          lastRunAt: new Date().toISOString(),
+          lastRunStatus:
+            `skipped: job already active (tab ${existing.tabId}, ` +
+            `kind=${existing.kind}, page ${existing.pageCount})`,
+        });
+        return;
+      }
+
+      const started = await startNextJob();
+      await chrome.storage.local.set({
+        lastRunAt: new Date().toISOString(),
+        lastRunStatus: started ? "ok" : "idle: no queued jobs or active searches",
+      });
+    } catch (err) {
+      console.error("[capture-loop] run failed", err);
+      await chrome.storage.local.set({
+        lastRunAt: new Date().toISOString(),
+        lastRunStatus: `error: ${err && err.message ? err.message : String(err)}`,
+      });
+    } finally {
+      captureLoopRunning = false;
+    }
+  }
+
+  async function startNextJob() {
+    const secret = await getSecret();
+
+    const queueRes = await fetch(`${API_BASE}/ingest/capture-queue`, {
+      headers: { "X-Ingest-Secret": secret },
+    });
+    if (!queueRes.ok) {
+      throw new Error(`GET /ingest/capture-queue failed: ${queueRes.status}`);
+    }
+    const { jobs } = await queueRes.json();
+    await chrome.storage.local.set({ lastQueueDepth: jobs ? jobs.length : 0 });
+
+    if (jobs && jobs.length > 0) {
+      await openJobTab({ url: jobs[0].url, kind: jobs[0].kind });
+      return true; // Prioritize queued detail/baseline captures over search polling.
+    }
+
+    const searchesRes = await fetch(`${API_BASE}/ingest/searches`, {
+      headers: { "X-Ingest-Secret": secret },
+    });
+    if (!searchesRes.ok) {
+      throw new Error(`GET /ingest/searches failed: ${searchesRes.status}`);
+    }
+    const { searches } = await searchesRes.json();
+
+    if (searches && searches.length > 0) {
+      // One search at a time, so at most one capture tab is ever open and
+      // each portal gets a slow, humanlike overall cadence.
+      await openJobTab({ url: searches[0].url, kind: "search" });
+      return true;
+    }
+
+    return false;
+  }
+
+  async function openJobTab(job) {
+    let tab;
+    try {
+      tab = await chrome.tabs.create({ url: job.url, active: false });
+    } catch (err) {
+      console.error("Failed to open capture tab for", job.url, err);
+      return;
+    }
+    const now = new Date().toISOString();
+    await setActiveJob({
+      tabId: tab.id,
       kind: job.kind,
       pageCount: 0,
-      resolve,
-      timeoutId: null,
+      jobUrl: job.url,
+      startedAt: now,
+      lastCheckinAt: now,
     });
-    armWatchdog(tabId);
+  }
+
+  // If the user (or Chrome, e.g. on crash recovery) closes a capture tab
+  // directly, don't leave the persisted job state (or the queue) stuck.
+  chrome.tabs.onRemoved.addListener(async (tabId) => {
+    const job = await getActiveJob();
+    if (job && job.tabId === tabId) {
+      await clearActiveJob();
+    }
   });
+
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    const tabId = sender.tab && sender.tab.id;
+    if (tabId == null) return undefined;
+
+    if (msg.type === "GET_JOB_KIND") {
+      handleGetJobKind(tabId).then(sendResponse);
+      return true; // keep the message channel open for the async response
+    }
+
+    if (msg.type === "CAPTURE_DONE") {
+      handleCaptureDone(tabId).then(() => sendResponse({ ok: true }));
+      return true;
+    }
+
+    return undefined;
+  });
+
+  async function handleGetJobKind(tabId) {
+    const job = await getActiveJob();
+    if (!job || job.tabId !== tabId) {
+      // Not the tab background.js opened for the current job (e.g. plain
+      // browsing on one of the matched domains, or a stray message from a
+      // job that has already finished) -- stay passive.
+      return { kind: null, pageIndex: 0, maxSearchPages: MAX_SEARCH_PAGES };
+    }
+    job.pageCount += 1;
+    job.lastCheckinAt = new Date().toISOString();
+    await setActiveJob(job); // persists the new page count AND resets the watchdog clock
+    return { kind: job.kind, pageIndex: job.pageCount, maxSearchPages: MAX_SEARCH_PAGES };
+  }
+
+  async function handleCaptureDone(tabId) {
+    const job = await getActiveJob();
+    if (job && job.tabId === tabId) {
+      await clearActiveJob();
+    }
+    await closeTab(tabId);
+    // Try the next job immediately instead of waiting out the rest of the
+    // 2-minute alarm period. If this worker gets evicted before it starts,
+    // the next scheduled capture-loop tick picks up any remaining work.
+    runCaptureLoop();
+  }
 }
 
-// If the user (or Chrome, e.g. on crash recovery) closes a capture tab
-// directly, don't leave its job promise hanging forever.
-chrome.tabs.onRemoved.addListener((tabId) => {
-  const entry = cleanupJob(tabId);
-  if (entry) entry.resolve("tab_closed");
-});
-
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  const tabId = sender.tab && sender.tab.id;
-  if (tabId == null) return undefined;
-
-  if (msg.type === "GET_JOB_KIND") {
-    const entry = pendingJobs.get(tabId);
-    if (!entry) {
-      // This tab isn't one background.js opened for a job (e.g. the user is
-      // just browsing a portal normally) -- tell content.js there's no job
-      // so it stays completely passive.
-      sendResponse({ kind: null, pageIndex: 0, maxSearchPages: MAX_SEARCH_PAGES });
-      return undefined;
-    }
-    entry.pageCount += 1;
-    armWatchdog(tabId); // page loaded successfully; reset the stall watchdog
-    sendResponse({
-      kind: entry.kind,
-      pageIndex: entry.pageCount,
-      maxSearchPages: MAX_SEARCH_PAGES,
-    });
-    return undefined;
-  }
-
-  if (msg.type === "CAPTURE_DONE") {
-    finishJob(tabId, "done");
-    return undefined;
-  }
-
-  return undefined;
-});
+// Exported only for the plain-Node unit test; a no-op in the extension
+// runtime (Chrome service workers don't define `module`).
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { isJobStale, STALE_JOB_MS, MAX_SEARCH_PAGES };
+}
