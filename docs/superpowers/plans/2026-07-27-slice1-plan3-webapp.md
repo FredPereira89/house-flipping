@@ -6,6 +6,55 @@
 
 **Spec:** `docs/superpowers/specs/2026-07-27-sourcing-engine-postgres-design.md`
 
+## AMENDMENT (Claude review, 2026-07-28)
+
+Reviewed against the design spec (`docs/superpowers/specs/2026-07-27-sourcing-engine-postgres-design.md`)
+and `web/prisma/schema.prisma`. Approved to proceed with the following
+corrections folded in — these are real defects/gaps, not style
+preferences, so implementers should treat them as part of the task spec:
+
+1. **Org-scoping is not optional and is missing from every task below.**
+   The spec is explicit: "every tenant-owned table carries `org_id`,
+   enforced at the Prisma query layer" (design spec §5). `SourcingLead`,
+   `SavedSearch`, `Settings`, `DisqualifyKeyword`, `LeadPhoto` (via its
+   lead), `LeadPriceHistory` (via its lead) are all tenant-owned. Every
+   Prisma query in Tasks 2–4 MUST filter by `session.user.orgId` (or join
+   through a relation that does), even though there is only one org today.
+   `Area`/`AreaPriceBaseline` remain global per D9 — do not scope those.
+   Add `orgId` to the session/JWT callback in Task 1 so it's available to
+   every server component/route without a second DB round-trip.
+
+2. **Task 3 Step 1's "use the AI image generation tool to create realistic
+   mockups" for missing photos is struck.** No such tool is available in
+   this environment, and more importantly it violates this project's own
+   synthetic-fixture convention (§9 of HANDOFF.md / the `_synthetic.html`
+   fixture naming rule established in Plan 2): a photorealistic fake
+   property photo generated to look real is exactly the kind of thing that
+   gets mistaken for genuine captured data later. Use a plain, obviously-a-
+   placeholder graphic (e.g. a flat "no photo available" SVG/icon) when a
+   lead has zero `LeadPhoto` rows. Never fabricate photos that could pass
+   as real listing photos.
+
+3. **Photo-serving path resolution (Task 3 Step 1).** `ingest/routes_detail.py`
+   writes `LeadPhoto.localPath` as `data/photos/{leadId}/{idx}.jpg` relative
+   to the repo root (where the Python ingest service runs from), NOT
+   relative to `web/`. A Next.js API route resolving this path needs to
+   join it against the repo root explicitly (e.g. `path.join(process.cwd(),
+   "..", "data", "photos", ...)` from `web/`, or better, a single
+   `DATA_DIR` constant computed once) — a naive relative read will silently
+   404 or resolve to the wrong directory. Also: build the path from the
+   `leadId` + `position` looked up via Prisma (scoped to the session's org
+   through the lead), never from a raw path segment taken directly off the
+   request, to avoid path traversal.
+
+4. **Auth secret.** Auth.js/NextAuth needs an `AUTH_SECRET` (or
+   `NEXTAUTH_SECRET`) env var. Per the standing project rule, no agent may
+   create or read `.env*` files. Task 1's implementer should tell the user
+   what key to add to `web/.env` and let the user add it themselves, not
+   attempt to write it.
+
+---
+
 ## File Structure Additions
 
 ```text
