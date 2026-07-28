@@ -1,15 +1,102 @@
-export default function HomePage() {
+import type { Metadata } from "next";
+
+import LeadCard from "@/components/LeadCard";
+import type { LeadWithArea } from "@/components/LeadCard";
+import { prisma } from "@/lib/prisma";
+import { requireSession } from "@/lib/session";
+
+export const metadata: Metadata = {
+  title: "Leads",
+  description: "Sourced property leads for your organization, newest first.",
+};
+
+type DuplicateGroupRow = {
+  lead_id: string;
+  group_key: string;
+};
+
+/**
+ * `v_lead_duplicate_groups` is a plain SQL view (see the
+ * `20260727185418_add_duplicate_groups_view` migration), not a Prisma
+ * model, so it's queried with `$queryRaw`. A lead only counts as "possibly
+ * duplicated" when its `group_key` appears more than once for this org —
+ * a `group_key` with a single row just means no other lead matched its
+ * area/typology/size/price bucket.
+ */
+async function fetchDuplicateLeadIds(orgId: string): Promise<Set<string>> {
+  const rows = await prisma.$queryRaw<DuplicateGroupRow[]>`
+    SELECT lead_id, group_key
+    FROM v_lead_duplicate_groups
+    WHERE org_id = ${orgId}
+  `;
+
+  const countByGroupKey = new Map<string, number>();
+  for (const row of rows) {
+    countByGroupKey.set(
+      row.group_key,
+      (countByGroupKey.get(row.group_key) ?? 0) + 1,
+    );
+  }
+
+  const duplicateLeadIds = new Set<string>();
+  for (const row of rows) {
+    if ((countByGroupKey.get(row.group_key) ?? 0) > 1) {
+      duplicateLeadIds.add(row.lead_id);
+    }
+  }
+
+  return duplicateLeadIds;
+}
+
+export default async function HomePage() {
+  const session = await requireSession();
+  const orgId = session.user.orgId;
+
+  const [leads, duplicateLeadIds] = await Promise.all([
+    prisma.sourcingLead.findMany({
+      where: { orgId },
+      orderBy: { lastSeenAt: "desc" },
+      include: { area: true },
+    }) as Promise<LeadWithArea[]>,
+    fetchDuplicateLeadIds(orgId),
+  ]);
+
+  const hotCount = leads.filter((lead) => lead.status === "hot_lead").length;
+
   return (
     <div className="container" style={{ paddingBlock: "var(--space-8)" }}>
-      <section className="surface" style={{ padding: "var(--space-6)" }}>
-        <span className="badge badge--brand">Scaffold</span>
-        <h1 style={{ marginTop: "var(--space-3)" }}>House Flipping Pipeline</h1>
-        <p>
-          The Next.js scaffold is up and running. The real leads dashboard
-          (filters, hot-lead highlighting, duplicate clustering) lands in a
-          later task.
-        </p>
-      </section>
+      <header className="leads-header">
+        <div>
+          <span className="badge badge--brand">Dashboard</span>
+          <h1>Sourced leads</h1>
+          <p>
+            {leads.length} lead{leads.length === 1 ? "" : "s"} in your
+            pipeline
+            {hotCount > 0 &&
+              ` — ${hotCount} marked hot`}
+            .
+          </p>
+        </div>
+      </header>
+
+      {leads.length === 0 ? (
+        <div className="surface" style={{ padding: "var(--space-6)" }}>
+          <p style={{ margin: 0 }}>
+            No leads yet. Once a saved search runs, sourced listings will
+            appear here.
+          </p>
+        </div>
+      ) : (
+        <div className="lead-grid">
+          {leads.map((lead) => (
+            <LeadCard
+              key={lead.id}
+              lead={lead}
+              isDuplicate={duplicateLeadIds.has(lead.id)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
