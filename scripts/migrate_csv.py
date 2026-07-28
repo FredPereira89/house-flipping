@@ -15,8 +15,28 @@ from ingest.repositories import leads as leads_repo
 from ingest.evaluate import price_per_sqm, discount_pct, is_hot_lead
 from ingest.area_matcher import match_area
 from ingest.disqualify import check as disqualify_check, load_keywords
+from ingest.parsers.idealista import ID_RE as IDEALISTA_ID_RE
+from ingest.parsers.imovirtual import ID_RE as IMOVIRTUAL_ID_RE
+from ingest.parsers.olx import ID_RE as OLX_ID_RE
 
 DEFAULT_ORG_ID = "default-org"
+
+# Same per-portal ID patterns the live parsers use to derive `external_id`
+# from a listing URL, so CSV-migrated rows dedupe against live ingestion on
+# the (portal, external_id) natural key instead of inventing a new scheme.
+PORTAL_ID_PATTERNS = {
+    "idealista": IDEALISTA_ID_RE,
+    "imovirtual": IMOVIRTUAL_ID_RE,
+    "olx": OLX_ID_RE,
+}
+
+
+def external_id_from_link(portal: str, link: str) -> str | None:
+    pattern = PORTAL_ID_PATTERNS.get(portal)
+    if not pattern or not link:
+        return None
+    match = pattern.search(link)
+    return match.group(1) if match else None
 
 
 def parse_args():
@@ -48,28 +68,38 @@ def migrate(csv_path: str):
         all_areas = areas_repo.load_areas(conn)
         keywords = load_keywords(conn, DEFAULT_ORG_ID)
         
-        with open(csv_path, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
+        with open(csv_path, "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f, delimiter=";")
             
             new_count = 0
             updated_count = 0
             
             for row in reader:
-                price = Decimal(row["price"]) if row.get("price") else None
-                area_val = Decimal(row["area_sqm_gross"]) if row.get("area_sqm_gross") else None
-                typology = int(row["typology"]) if row.get("typology") else None
+                price = Decimal(row["price"]) if row.get("price") and row["price"] != "N/A" else None
+                area_val = Decimal(row["area_m2"]) if row.get("area_m2") and row["area_m2"] != "N/A" else None
+                typology_str = row.get("typology", "").strip().upper()
+                if typology_str.startswith("T"):
+                    typology_str = typology_str[1:]
+                typology = int(typology_str) if typology_str.isdigit() else None
+                
+                portal = row["portal"].lower() if row.get("portal") else "idealista"
+                link = row.get("link")
+                
+                external_id = external_id_from_link(portal, link)
+                if not external_id:
+                    continue
                 
                 item = {
-                    "portal": row["portal"],
-                    "external_id": row["external_id"],
-                    "url": row["url"],
-                    "title": row.get("title"),
+                    "portal": portal,
+                    "external_id": external_id,
+                    "url": link,
+                    "title": None,
                     "description": row.get("description"),
                     "price": price,
                     "area_sqm_gross": area_val,
                     "typology": typology,
-                    "raw_location_text": row.get("raw_location_text"),
-                    "image_urls": [],
+                    "raw_location_text": row.get("location"),
+                    "image_urls": [row["image_url"]] if row.get("image_url") else [],
                 }
                 
                 text = " ".join(filter(None, [
