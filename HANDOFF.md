@@ -1,8 +1,8 @@
 # Handoff — House Flipping Pipeline Platform
 
-**Written:** 2026-07-27
+**Written:** 2026-07-27, updated 2026-07-28
 **For:** Next Agent / Developer
-**Status:** ALL 13 Tasks in Plan 1 (Slice 1) are COMPLETE. All Tasks in Plan 2 (Slice 1) are COMPLETE. Plan 3 is designed and ready for implementation.
+**Status:** ALL 13 Tasks in Plan 1 are COMPLETE. All Tasks in Plan 2 are COMPLETE. All 5 Tasks in Plan 3 (Next.js web app) are COMPLETE. **The mandatory final whole-branch review across all three plans has NOT been done yet** — see §4a, this is the concrete next step, not a completed one.
 
 Read this file top to bottom before touching anything. It is the map.
 
@@ -58,6 +58,7 @@ most important section of this document.
 | **Design spec (Slice 1)** | `docs/superpowers/specs/2026-07-27-sourcing-engine-postgres-design.md` | Approved by the user. 13 numbered decisions with rationale. **This governs.** |
 | **Plan 1 (executed)** | `docs/superpowers/plans/2026-07-27-slice1-foundation-and-listing-ingest.md` | 13 tasks, all 13 are COMPLETE. |
 | **Plan 2 (executed)** | `docs/superpowers/plans/2026-07-27-slice1-plan2-capture.md` | All tasks COMPLETE. |
+| **Plan 3 (executed)** | `docs/superpowers/plans/2026-07-27-slice1-plan3-webapp.md` | All 5 tasks COMPLETE. Has a Claude pre-implementation review/amendment at the top — read it, it documents 4 real fixes folded into the tasks (org-scoping, no fake photos, photo path resolution, auth secret handling). |
 | Original prompt | `house-flip-app-claude-code-prompt.md` | Historical. Superseded where it conflicts with the spec. |
 
 If the spec and the original prompt disagree, **the spec wins**.
@@ -66,17 +67,43 @@ If the spec and the original prompt disagree, **the spec wins**.
 
 ## 4. Current state
 
-**Next Steps:**
-1. **Claude Review for Plan 3:** Before beginning implementation, Claude must review the updated plan at `docs/superpowers/plans/2026-07-27-slice1-plan3-webapp.md`. The plan has been updated with modern web standards, but requires Claude's final approval.
-2. **Implement Plan 3 (Next.js web app):** Once Claude approves the plan, proceed with implementing the Next.js web app following the plan.
-2. **Review Open Questions:** Section 7 has open questions that the user still needs to decide on, especially regarding AI modules and ARV.
+**Next Steps (in order):**
+1. **Run the final whole-branch code review** (see §4a immediately below) — this was dispatched once already (on 2026-07-27) and got interrupted by a session/API limit before producing a single finding. It has still never actually run. Do this before anything else, and definitely before merging/finishing this branch.
+2. **User needs to add `NEXTAUTH_SECRET`** (a random string) to `web/.env` before the Plan 3 web app's auth will work at runtime — no agent has touched that file, by design (see §6's env-file rule). Nobody can do this step but the user.
+3. **Seed a real login**: `web/prisma/seed.ts` creates the admin user (`SEED_USER_EMAIL`/`SEED_USER_PASSWORD` env vars, defaults `admin@example.com`/`changeme`) — run `npx prisma db seed` inside `web/` if it hasn't been run against the current DB, then sign in at `/api/auth/signin`.
+4. **Review Open Questions:** Section 7 has open questions the user still needs to decide on, especially regarding AI modules and ARV.
+5. Slice 2 (projects/budgets/contractors) has no design yet — needs its own design pass before implementation, per §8.
+
+### 4a. The final whole-branch review is still outstanding — read this before assuming Plan 1-3 are "done and clean"
+
+Every task in Plan 1, Plan 2, and Plan 3 has been implemented and passed its own **task-scoped** review (an SDD review of just that task's diff). What has **never** happened is the final review of the **whole branch together** — checking cross-task/cross-plan consistency, whether Plan 1's Tasks 4-13 and Plan 2's Tasks 0-1 (which were built by an earlier session outside this repo's SDD review loop entirely) hold up under the same scrutiny everything since has gotten, and whether the three plans compose correctly end-to-end.
+
+This was dispatched once (2026-07-27, opus model) with a comprehensive prompt covering the spec's D1-D13 decisions, the project's lossless-parsing/silent-failure conventions, and a specific instruction to check whether `tests/test_queue.py`'s flaky-vs-deterministic failure behavior is a real concurrency bug — but the subagent hit a session/API limit and was terminated **before reading anything or producing a single finding**. Nothing from that attempt should be treated as a completed review.
+
+Everything needed to redo it is on disk:
+- **Ledger for Plan 1 + Plan 2**: `.superpowers/sdd/2026-07-27-slice1-plan2-capture/progress.md` — full history of every finding/fix across those two plans.
+- **Ledger for Plan 3**: `.superpowers/sdd/2026-07-27-slice1-plan3-webapp/progress.md` — full history for the web app, including the pre-implementation amendment and all 5 task reviews (zero fix rounds needed, but read the parked/deferred minors listed at the bottom).
+- **Pre-built review package (Plan 1+2 only, needs regenerating to also cover Plan 3)**: `.superpowers/sdd/2026-07-27-slice1-plan2-capture/review-180ae5e..0828722-code-only.diff` — deliberately excludes bulk fixture HTML/lockfiles from the diff body. Regenerate a fresh one covering `180ae5e..<current HEAD>` before dispatching, since Plan 3 (5 more commits) isn't in this file yet.
+- Never-before-reviewed files flagged as worth extra scrutiny: `ingest/area_matcher.py`, `ingest/disqualify.py`, `ingest/evaluate.py`, `ingest/parsers/idealista.py`, the `/ingest/listings` endpoint, `scripts/migrate_csv.py` (all from Plan 1's externally-built tasks).
+- Two specific "unverified against real markup" risks to flag prominently to whoever does the review: `baselines_idealista.py`'s `.price-evolution .price` selector, and the naive URL-slug-to-area-slug matching in the same file — neither has ever been tested against a real captured idealista page.
+
+**Do not report Plan 1/2/3 as fully reviewed or production-safe until this actually runs.**
+
+**Done in Plan 3 (All 5/5 tasks) — Next.js web app, `web/`:**
+- **Task 0** — Next.js App Router scaffold, vanilla-CSS design-token system (oklch colors, dark mode, restrained motion — no Tailwind), Prisma client generation.
+- **Task 1** — NextAuth v4 + `@next-auth/prisma-adapter` with a Credentials provider (bcrypt against `User.passwordHash`), JWT sessions carrying `orgId`/`role` (required because Credentials auth can't use DB-backed sessions in NextAuth v4), server-side auth guard on every route, sidebar nav.
+- **Task 2** — Leads dashboard (`/`) and Triage UI (`/triage`) for unassigned areas. Duplicate-group badge via a parameterized raw-SQL query against the `v_lead_duplicate_groups` view (D13, read-only, never merges). Triage assignment API route enforces org ownership before writing and "learns" the raw location text into `Area.aliases`.
+- **Task 3** — Property details page (`/leads/[id]`): photo carousel (pure CSS scroll-snap), price history graph (hand-rolled SVG), baseline comparison against `AreaPriceBaseline`. The photo-serving API route (`/api/photos/[leadId]/[position]`) is the highest-risk file in this plan — it verifies DB ownership through a join *before* touching the filesystem, and resolves the path relative to the repo root (not `web/`, since `ingest/routes_detail.py` writes photos relative to repo root).
+- **Task 4** — Admin UI: Settings + Disqualify Keywords (`/admin/settings`), Saved Searches CRUD (`/admin/searches`), Alerts (`/alerts`). Every write route looks the target row up and verifies `orgId` ownership before writing — no route trusts an org id from the request body.
+
+Every single task across Plan 3 passed its task-scoped review with **zero fix rounds** — the org-scoping requirement added in the pre-implementation amendment (every tenant-owned query must filter by `session.user.orgId`; `Area`/`AreaPriceBaseline` stay global per D9) was independently re-verified by a fresh reviewer subagent at every task, reading the actual route/query code rather than trusting the implementer's own report. Full detail, including the couple of parked non-blocking minors, is in `.superpowers/sdd/2026-07-27-slice1-plan3-webapp/progress.md`.
 
 **Done in Plan 2 (All 5/5 tasks):**
 - **Task 0** — Database Schema Update (`CaptureQueue` and `LeadPhoto` models).
 - **Task 1** — Enqueue `hot_lead`s and Orchestration Endpoints (`/ingest/searches`, `/ingest/capture-queue`).
-- **Task 2** — The Self-Driving Chrome Extension (background.js MV3 worker, watchdog, capture loop).
-- **Task 3** — Detail Page Parser & High-Res Images.
-- **Task 4** — Idealista Market Baselines Ingest.
+- **Task 2** — The Self-Driving Chrome Extension (background.js MV3 worker, watchdog, capture loop). Two fix rounds during its original review: MV3 service-worker eviction (in-memory job state didn't survive worker restarts — moved to `chrome.storage.local` + a second `chrome.alarms` watchdog), then a queue-drain regression that fix introduced (the queue endpoint was still claiming up to 5 rows per tick while the extension only processed 1, stranding the rest — fixed by requesting `limit=1`).
+- **Task 3** — Detail Page Parser & High-Res Images. One fix round: lossy description parser (only grabbed the first `<p>`, fixed to capture all paragraphs) and a fake regression test that didn't actually reconstruct its target bug's precondition (fixed with a real repro).
+- **Task 4** — Idealista Market Baselines Ingest. One fix round: a currency-regex bug that could corrupt prices containing a bare digit in a unit suffix like "m2" (fixed by anchoring to the leading numeric run instead of stripping non-digits from the whole string).
 
 **Done in Plan 1 (All 13/13 tasks):**
 - **Task 1** — Postgres 18 in Docker, `pg_trgm` + `unaccent`, connection test passing.
@@ -125,7 +152,7 @@ Four units. Two contracts: one HTTP boundary, and the database schema.
 |---|---|---|
 | `extension/` | JS | Drives Chrome on a schedule, captures HTML, posts it. No property logic. |
 | `ingest/` | Python/Flask | Parses HTML → normalized leads. Dedupe, disqualify, evaluate, persist. Owns parsers. |
-| `web/` | Next.js/TS | Auth, leads UI, triage, admin. Read-mostly. **Not built yet — Plan 3.** |
+| `web/` | Next.js/TS | Auth, leads UI, triage, admin. Read-mostly. **Built in Plan 3** — see §4a for the outstanding final review. |
 | Postgres 18 | — | Single source of truth. |
 
 **Key decisions you must not silently reverse:**
@@ -225,7 +252,7 @@ Plan 1 is roughly 15–20% of the total build.
 |---|---|---|
 | Slice 1 · Plan 1 | DB, ingest service, evaluation, CSV migration | COMPLETE |
 | Slice 1 · Plan 2 | Self-driving extension, `capture_queue`, detail capture, idealista baselines | COMPLETE |
-| Slice 1 · Plan 3 | Next.js web app — leads, triage, alerts, admin | Planned and reviewed. Ready for implementation. |
+| Slice 1 · Plan 3 | Next.js web app — leads, triage, alerts, admin | COMPLETE (final whole-branch review still pending, §4a) |
 | Slice 2 | Projects, property details, budgets, expenses, tasks, contractors, documents | Not designed |
 | Slice 3 | AI evaluation — provider interface, vision condition scoring, cost matrix, ARV | Not designed |
 | Slice 4 | Contractor quote parsing, rubric categorisation, overcapitalisation alerts | Not designed |
