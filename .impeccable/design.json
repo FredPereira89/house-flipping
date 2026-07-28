@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-28T15:00:00Z",
+  "title": "Design System: House Flipping Pipeline",
+  "extensions": {
+    "colorMeta": {
+      "terminal-blue": {
+        "role": "primary",
+        "displayName": "Terminal Blue",
+        "canonical": "oklch(58% 0.16 258)",
+        "tonalRamp": ["oklch(15% 0.10 258)", "oklch(28% 0.14 258)", "oklch(40% 0.16 258)", "oklch(50% 0.17 258)", "oklch(58% 0.16 258)", "oklch(70% 0.12 258)", "oklch(82% 0.08 258)", "oklch(92% 0.04 258)"]
+      },
+      "terminal-blue-deep": {
+        "role": "primary",
+        "displayName": "Terminal Blue Deep",
+        "canonical": "oklch(48% 0.17 258)",
+        "tonalRamp": ["oklch(12% 0.10 258)", "oklch(22% 0.14 258)", "oklch(33% 0.16 258)", "oklch(40% 0.17 258)", "oklch(48% 0.17 258)", "oklch(60% 0.15 258)", "oklch(74% 0.10 258)", "oklch(88% 0.05 258)"]
+      },
+      "terminal-blue-tint": {
+        "role": "primary",
+        "displayName": "Terminal Blue Tint",
+        "canonical": "oklch(94% 0.03 258)",
+        "tonalRamp": ["oklch(30% 0.06 258)", "oklch(45% 0.05 258)", "oklch(60% 0.045 258)", "oklch(75% 0.04 258)", "oklch(85% 0.035 258)", "oklch(90% 0.032 258)", "oklch(94% 0.03 258)", "oklch(97% 0.015 258)"]
+      },
+      "signal-hot": {
+        "role": "secondary",
+        "displayName": "Signal Hot",
+        "canonical": "oklch(62% 0.22 35)",
+        "tonalRamp": ["oklch(15% 0.08 35)", "oklch(28% 0.14 35)", "oklch(40% 0.18 35)", "oklch(50% 0.21 35)", "oklch(62% 0.22 35)", "oklch(72% 0.17 35)", "oklch(84% 0.10 35)", "oklch(94% 0.05 35)"]
+      },
+      "signal-hot-tint": {
+        "role": "secondary",
+        "displayName": "Signal Hot Tint",
+        "canonical": "oklch(95% 0.05 35)",
+        "tonalRamp": ["oklch(32% 0.08 35)", "oklch(45% 0.07 35)", "oklch(60% 0.065 35)", "oklch(75% 0.06 35)", "oklch(85% 0.055 35)", "oklch(90% 0.05 35)", "oklch(95% 0.05 35)", "oklch(98% 0.02 35)"]
+      },
+      "signal-success": {
+        "role": "secondary",
+        "displayName": "Signal Success",
+        "canonical": "oklch(62% 0.16 150)",
+        "tonalRamp": ["oklch(15% 0.06 150)", "oklch(28% 0.10 150)", "oklch(40% 0.13 150)", "oklch(50% 0.15 150)", "oklch(62% 0.16 150)", "oklch(72% 0.12 150)", "oklch(84% 0.08 150)", "oklch(94% 0.05 150)"]
+      },
+      "signal-warning": {
+        "role": "secondary",
+        "displayName": "Signal Warning",
+        "canonical": "oklch(75% 0.15 80)",
+        "tonalRamp": ["oklch(15% 0.05 80)", "oklch(28% 0.09 80)", "oklch(40% 0.12 80)", "oklch(52% 0.14 80)", "oklch(64% 0.15 80)", "oklch(75% 0.15 80)", "oklch(85% 0.10 80)", "oklch(94% 0.06 80)"]
+      },
+      "signal-danger": {
+        "role": "secondary",
+        "displayName": "Signal Danger",
+        "canonical": "oklch(58% 0.21 25)",
+        "tonalRamp": ["oklch(15% 0.08 25)", "oklch(28% 0.14 25)", "oklch(40% 0.18 25)", "oklch(50% 0.20 25)", "oklch(58% 0.21 25)", "oklch(70% 0.16 25)", "oklch(82% 0.10 25)", "oklch(94% 0.05 25)"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "oklch(98% 0.004 260)",
+        "tonalRamp": ["oklch(15% 0.014 260)", "oklch(27% 0.016 260)", "oklch(40% 0.018 260)", "oklch(55% 0.015 260)", "oklch(70% 0.01 260)", "oklch(85% 0.007 260)", "oklch(93% 0.005 260)", "oklch(98% 0.004 260)"]
+      },
+      "paper-elevated": {
+        "role": "neutral",
+        "displayName": "Paper Elevated",
+        "canonical": "oklch(100% 0 0)",
+        "tonalRamp": ["oklch(19% 0.014 260)", "oklch(24% 0.016 260)", "oklch(40% 0.01 260)", "oklch(60% 0.006 260)", "oklch(80% 0.003 260)", "oklch(92% 0.001 260)", "oklch(97% 0 0)", "oklch(100% 0 0)"]
+      },
+      "paper-subtle": {
+        "role": "neutral",
+        "displayName": "Paper Subtle",
+        "canonical": "oklch(96% 0.006 260)",
+        "tonalRamp": ["oklch(17% 0.015 260)", "oklch(27% 0.017 260)", "oklch(40% 0.018 260)", "oklch(55% 0.014 260)", "oklch(70% 0.01 260)", "oklch(85% 0.008 260)", "oklch(92% 0.007 260)", "oklch(96% 0.006 260)"]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "oklch(90% 0.008 260)",
+        "tonalRamp": ["oklch(20% 0.016 260)", "oklch(30% 0.017 260)", "oklch(42% 0.018 260)", "oklch(55% 0.016 260)", "oklch(68% 0.012 260)", "oklch(80% 0.01 260)", "oklch(86% 0.009 260)", "oklch(90% 0.008 260)"]
+      },
+      "rule-strong": {
+        "role": "neutral",
+        "displayName": "Rule Strong",
+        "canonical": "oklch(82% 0.012 260)",
+        "tonalRamp": ["oklch(22% 0.018 260)", "oklch(33% 0.02 260)", "oklch(42% 0.02 260)", "oklch(52% 0.018 260)", "oklch(64% 0.016 260)", "oklch(74% 0.014 260)", "oklch(78% 0.013 260)", "oklch(82% 0.012 260)"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(22% 0.02 260)",
+        "tonalRamp": ["oklch(15% 0.02 260)", "oklch(22% 0.02 260)", "oklch(33% 0.018 260)", "oklch(46% 0.02 260)", "oklch(62% 0.015 260)", "oklch(78% 0.01 260)", "oklch(90% 0.006 260)", "oklch(96% 0.004 260)"]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Ink Muted",
+        "canonical": "oklch(46% 0.02 260)",
+        "tonalRamp": ["oklch(20% 0.02 260)", "oklch(30% 0.02 260)", "oklch(38% 0.02 260)", "oklch(46% 0.02 260)", "oklch(56% 0.018 260)", "oklch(68% 0.015 260)", "oklch(80% 0.01 260)", "oklch(90% 0.006 260)"]
+      },
+      "ink-faint": {
+        "role": "neutral",
+        "displayName": "Ink Faint",
+        "canonical": "oklch(53% 0.015 260)",
+        "tonalRamp": ["oklch(30% 0.018 260)", "oklch(38% 0.018 260)", "oklch(46% 0.017 260)", "oklch(53% 0.015 260)", "oklch(62% 0.015 260)", "oklch(72% 0.013 260)", "oklch(82% 0.01 260)", "oklch(90% 0.006 260)"]
+      }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "Page-level <h1> only — 'Sourced leads', a lead's own title on its detail page." },
+      "title": { "displayName": "Title", "purpose": "Section-level <h2>/<h3> within a page." },
+      "body": { "displayName": "Body", "purpose": "Default paragraph and UI text throughout." },
+      "label": { "displayName": "Label", "purpose": "Uppercase small-caps naming a value (stat labels, badges, category headers) — never competes with the value it names." }
+    },
+    "shadows": [
+      { "name": "resting", "value": "0 1px 2px oklch(0% 0 0 / 0.06)", "purpose": "Default state for every .surface card — barely perceptible separation from the page." },
+      { "name": "hover", "value": "0 4px 16px oklch(0% 0 0 / 0.10)", "purpose": "Cards and the primary button on hover — depth earned by interaction." },
+      { "name": "overlay", "value": "0 12px 32px oklch(0% 0 0 / 0.14)", "purpose": "Modals and popovers floating above a dimmed backdrop." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "The single easing curve used everywhere — a confident, slightly decelerated settle." },
+      { "name": "duration-fast", "value": "120ms", "purpose": "Press/active-state feedback (button scale)." },
+      { "name": "duration-base", "value": "200ms", "purpose": "Default transition duration — hover states, theme change." },
+      { "name": "duration-slow", "value": "360ms", "purpose": "Reserved for larger/rarer transitions." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "720px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one high-emphasis action per view (e.g. a form's submit). Gradient fill, white text, shadow deepens on hover.",
+      "html": "<button class=\"ds-btn-primary\">Save changes</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 1rem; border: 1px solid transparent; border-radius: 0.625rem; background: linear-gradient(135deg, oklch(58% 0.16 258), oklch(66% 0.14 220)); color: #fff; font-weight: 500; font-size: 0.875rem; cursor: pointer; box-shadow: 0 1px 2px oklch(0% 0 0 / 0.06); transition: transform 120ms cubic-bezier(0.16,1,0.3,1), box-shadow 200ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-primary:hover { box-shadow: 0 4px 16px oklch(0% 0 0 / 0.10); } .ds-btn-primary:active { transform: scale(0.97); } .ds-btn-primary:focus-visible { outline: 2px solid oklch(58% 0.16 258); outline-offset: 2px; }"
+    },
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "Low-emphasis action — cancel, secondary controls, delete-from-list actions.",
+      "html": "<button class=\"ds-btn-default\">Cancel</button>",
+      "css": ".ds-btn-default { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 1rem; border: 1px solid transparent; border-radius: 0.625rem; background: oklch(96% 0.006 260); color: oklch(22% 0.02 260); font-weight: 500; font-size: 0.875rem; cursor: pointer; transition: transform 120ms cubic-bezier(0.16,1,0.3,1), background-color 200ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-default:hover { background: oklch(90% 0.008 260); } .ds-btn-default:active { transform: scale(0.97); } .ds-btn-default:focus-visible { outline: 2px solid oklch(58% 0.16 258); outline-offset: 2px; }"
+    },
+    {
+      "name": "Hot Lead Badge",
+      "kind": "chip",
+      "refersTo": "badge-hot",
+      "description": "Marks a lead whose price/m² clears the discount threshold — the system's one 'look here first' signal.",
+      "html": "<span class=\"ds-badge ds-badge--hot\">Hot lead</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; } .ds-badge--hot { background: oklch(95% 0.05 35); color: oklch(62% 0.22 35); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard form field across settings, keyword add, and saved-search modal. Border/outline shift on focus only; :user-invalid keeps first-load forms from flashing red.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Value\" />",
+      "css": ".ds-input { padding: 0.5rem 0.75rem; border: 1px solid oklch(90% 0.008 260); border-radius: 0.625rem; background: oklch(98% 0.004 260); color: oklch(22% 0.02 260); font: inherit; transition: border-color 120ms cubic-bezier(0.16,1,0.3,1), outline-color 120ms cubic-bezier(0.16,1,0.3,1); } .ds-input:focus-visible { outline: 2px solid oklch(58% 0.16 258); outline-offset: 1px; } .ds-input:user-invalid { border-color: oklch(58% 0.21 25); outline: 2px solid color-mix(in oklch, oklch(58% 0.21 25) 40%, transparent); outline-offset: 1px; }"
+    },
+    {
+      "name": "Sidebar Nav Link",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Vertical primary navigation. Rest state is muted; hover nudges right 2px; active state gets the tint background and deep-blue text.",
+      "html": "<a class=\"ds-nav-link ds-nav-link--active\" href=\"#\"><svg class=\"ds-nav-link__icon\" viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><path d=\"M3 11.5 12 4l9 7.5\" stroke=\"currentColor\" stroke-width=\"1.6\"/><path d=\"M5 10v9h14v-9\" stroke=\"currentColor\" stroke-width=\"1.6\"/></svg>Dashboard / Leads</a>",
+      "css": ".ds-nav-link { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 0.625rem; color: oklch(46% 0.02 260); font-size: 0.875rem; font-weight: 500; text-decoration: none; transition: background-color 120ms cubic-bezier(0.16,1,0.3,1), color 120ms cubic-bezier(0.16,1,0.3,1), transform 120ms cubic-bezier(0.16,1,0.3,1); } .ds-nav-link:hover { background: oklch(96% 0.006 260); color: oklch(22% 0.02 260); transform: translateX(2px); } .ds-nav-link--active { background: oklch(94% 0.03 258); color: oklch(48% 0.17 258); font-weight: 600; } .ds-nav-link__icon { width: 1.1rem; height: 1.1rem; flex-shrink: 0; }"
+    },
+    {
+      "name": "Lead Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The signature component — every visit revolves around a grid of these. Numbers-first: a three-column stat block always outranks the title in visual weight. The hot-lead variant is the system's one permitted departure from a flat neutral card.",
+      "html": "<article class=\"ds-lead-card ds-lead-card--hot\"><header class=\"ds-lead-card__header\"><span class=\"ds-badge ds-badge--hot\">Hot lead</span><span class=\"ds-lead-card__portal\">Idealista</span></header><h3 class=\"ds-lead-card__title\">Apartamento T2, Alvalade</h3><dl class=\"ds-lead-card__stats\"><div><dt>Price</dt><dd>239 000 €</dd></div><div><dt>€/m²</dt><dd>4 780 €/m²</dd></div><div><dt>Discount</dt><dd class=\"ds-lead-card__stat--positive\">12.4%</dd></div></dl></article>",
+      "css": ".ds-lead-card { padding: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; background: oklch(100% 0 0); border: 1px solid oklch(90% 0.008 260); border-radius: 1rem; box-shadow: 0 1px 2px oklch(0% 0 0 / 0.06); transition: box-shadow 200ms cubic-bezier(0.16,1,0.3,1), transform 200ms cubic-bezier(0.16,1,0.3,1); } .ds-lead-card:hover { box-shadow: 0 4px 16px oklch(0% 0 0 / 0.10); transform: translateY(-2px); } .ds-lead-card--hot { border-color: color-mix(in oklch, oklch(62% 0.22 35) 45%, oklch(90% 0.008 260)); background: linear-gradient(180deg, oklch(95% 0.05 35) 0%, oklch(100% 0 0) 42%); } .ds-lead-card__header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; } .ds-lead-card__portal { font-size: 0.75rem; color: oklch(62% 0.015 260); text-transform: capitalize; } .ds-lead-card__title { margin: 0; font-size: 1.125rem; color: oklch(22% 0.02 260); } .ds-lead-card__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin: 0; padding-top: 0.75rem; border-top: 1px solid oklch(90% 0.008 260); } .ds-lead-card__stats dt { font-size: 0.75rem; color: oklch(62% 0.015 260); text-transform: uppercase; letter-spacing: 0.02em; } .ds-lead-card__stats dd { margin: 0; font-size: 1rem; font-weight: 600; color: oklch(22% 0.02 260); } .ds-lead-card__stat--positive { color: oklch(62% 0.16 150) !important; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Analyst's Terminal",
+    "overview": "This is an instrument panel for one operator, not a storefront for a visitor. Every screen exists so its one user can look at a property lead, read its €/m² against the neighborhood baseline, and make a keep/reject/triage call in seconds — repeated over 731 leads and counting. The numbers are the hero: price, €/m², discount percentage, area. Everything else — chrome, motion, decoration — recedes so those numbers are never competing for attention.\n\nThe palette stays deliberately quiet: one confident, professional blue as the sole accent, spent sparingly (sidebar mark, links, focus rings, the 'hot lead' gradient's cooler partner), and a small set of named signal colors (hot/success/warning/danger) that map to real evaluation states, never used decoratively. Confirmed rejection: no marketing gloss, no gradients-for-their-own-sake, no illustration or stock imagery — this tool is read by the same person, at the same desk, dozens of times a day, and should feel exactly as calm on visit #500 as on visit #1.",
+    "keyCharacteristics": [
+      "Numbers-first hierarchy: price/€m²/discount always outrank titles and descriptions in visual weight.",
+      "One accent color, spent rarely — its rarity is what makes it legible as 'this matters.'",
+      "Flat by default; elevation is a hover response, not a resting decoration.",
+      "Full light/dark parity — every token pair is tuned independently, not auto-inverted.",
+      "Native platform primitives over custom widgets (<dialog>, Popover API, CSS scroll-snap) — less surface area, more consistency with the OS the operator already trusts."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Terminal Blue is the only non-semantic color in the system. If a new element needs emphasis and it isn't a signal state (hot/success/warning/danger), it borrows Terminal Blue or it doesn't get color at all — never a new hue.", "section": "colors" },
+      { "name": "The Independent Dark Mode Rule", "body": "Dark mode is not filter: invert() or an auto-generated palette. Every token has its own hand-tuned dark-mode value, applied via both prefers-color-scheme and an explicit [data-theme=\"dark\"] override for a future manual toggle.", "section": "colors" },
+      { "name": "The Numeral Precedence Rule", "body": "Wherever a label sits beside its value, the label is always smaller, lighter-colored, and uppercase; the value is always full-weight at body size or larger. A label must never out-rank the number it names.", "section": "typography" },
+      { "name": "The Earned Elevation Rule", "body": "No element ships with a resting shadow beyond the barely-perceptible default. Depth increases only as a direct response to hover/open state, and drops back at rest.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep Terminal Blue as the only non-semantic accent color — new emphasis needs borrow it, they don't introduce a new hue.",
+      "Do tune every dark-mode color independently; never auto-invert or filter: invert().",
+      "Do let numbers (price, €/m², discount, area) win the visual hierarchy over titles, descriptions, and chrome on every screen.",
+      "Do reach for native platform primitives (<dialog>, Popover API, :user-invalid, CSS scroll-snap) before reaching for a JS library.",
+      "Do respect prefers-reduced-motion globally — never bypass the system's collapse of all durations to 0.01ms with an inline animation."
+    ],
+    "donts": [
+      "Don't add gradients, illustration, or stock imagery for decorative purposes.",
+      "Don't give a badge a solid-fill background with white text — every badge uses the tint-background / saturated-text pairing.",
+      "Don't let a resting element carry a hover-tier shadow — elevation is earned by hover/open state only.",
+      "Don't validate a form field as invalid before the user has interacted with it — use :user-invalid, not :invalid.",
+      "Don't invest further visual identity in the \"House Flipping Pipeline\" name or \"HF\" mark — it's a placeholder; keep brand expression minimal until a real name is chosen."
+    ]
+  }
+}

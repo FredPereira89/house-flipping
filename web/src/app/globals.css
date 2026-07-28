@@ -57,7 +57,9 @@
 
   --color-text: oklch(22% 0.02 260);
   --color-text-muted: oklch(46% 0.02 260);
-  --color-text-faint: oklch(62% 0.015 260);
+  /* 53% (was 62%, measured 3.45:1) -- ~4.98:1 against --color-bg, clearing
+     WCAG AA's 4.5:1 for normal-size text with margin. */
+  --color-text-faint: oklch(53% 0.015 260);
 
   --color-brand: oklch(58% 0.16 258);
   --color-brand-strong: oklch(48% 0.17 258);
@@ -97,7 +99,10 @@
 
     --color-text: oklch(94% 0.006 260);
     --color-text-muted: oklch(74% 0.012 260);
-    --color-text-faint: oklch(56% 0.015 260);
+    /* 64% (was 56%, measured/computed ~3.97:1) -- ~5.49:1 against
+       --color-bg and ~4.89:1 against --color-bg-elevated, both clearing
+       WCAG AA's 4.5:1 with margin. */
+    --color-text-faint: oklch(64% 0.015 260);
 
     --color-brand: oklch(72% 0.14 258);
     --color-brand-strong: oklch(80% 0.12 258);
@@ -134,7 +139,7 @@
 
   --color-text: oklch(94% 0.006 260);
   --color-text-muted: oklch(74% 0.012 260);
-  --color-text-faint: oklch(56% 0.015 260);
+  --color-text-faint: oklch(64% 0.015 260);
 
   --color-brand: oklch(72% 0.14 258);
   --color-brand-strong: oklch(80% 0.12 258);
