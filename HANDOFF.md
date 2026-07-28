@@ -2,7 +2,7 @@
 
 **Written:** 2026-07-27, updated 2026-07-28
 **For:** Next Agent / Developer
-**Status:** ALL tasks in Plan 1, Plan 2, and Plan 3 are COMPLETE. The final whole-branch review ran and found 1 Critical + 9 Important findings — all 9 fixable ones are now fixed and independently re-verified (live DB reproduction, full test suite, manual fixture checks — see §4a). One finding (#8, baselines never triggered) is a deliberate, documented WONTFIX-for-now pending real captured markup (§7 item 3). **The branch is otherwise ready for `superpowers:finishing-a-development-branch`**, pending the user's `NEXTAUTH_SECRET` step below.
+**Status:** ALL tasks in Plan 1, Plan 2, and Plan 3 are COMPLETE. The final whole-branch review ran and found 1 Critical + 9 Important findings — all 9 fixable ones are fixed and independently re-verified (live DB reproduction, full test suite, manual fixture checks — see §4a). One finding (#8, baselines never triggered) is a deliberate, documented WONTFIX-for-now pending real captured markup (§7 item 3). **On top of that, a full `/impeccable` design pass ran on `web/`** (init → document → critique → polish → re-critique): design health score went 22/40 → 29/40, with `PRODUCT.md`/`DESIGN.md` now capturing product/design context for future work — see §4b for what's done and what's still open (one small P2 item: inconsistent `:focus-visible` ring coverage). **The branch is otherwise ready for `superpowers:finishing-a-development-branch`**, pending the user's `NEXTAUTH_SECRET` step below.
 
 Read this file top to bottom before touching anything. It is the map.
 
