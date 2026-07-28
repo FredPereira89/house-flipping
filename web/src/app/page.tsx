@@ -1,6 +1,6 @@
 export default function HomePage() {
   return (
-    <main className="container" style={{ paddingBlock: "var(--space-8)" }}>
+    <div className="container" style={{ paddingBlock: "var(--space-8)" }}>
       <section className="surface" style={{ padding: "var(--space-6)" }}>
         <span className="badge badge--brand">Scaffold</span>
         <h1 style={{ marginTop: "var(--space-3)" }}>House Flipping Pipeline</h1>
@@ -10,6 +10,6 @@ export default function HomePage() {
           later task.
         </p>
       </section>
-    </main>
+    </div>
   );
 }
