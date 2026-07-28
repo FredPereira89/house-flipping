@@ -34,9 +34,11 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
-  pages: {
-    signIn: "/api/auth/signin",
-  },
+  // No custom pages.signIn: NextAuth's own /api/auth/signin route renders
+  // its built-in sign-in form. Explicitly pointing pages.signIn at that
+  // same route caused an infinite self-redirect (its core signin handler
+  // redirects to pages.signIn whenever one is configured) -- nobody could
+  // reach a sign-in form at all.
   providers: [
     CredentialsProvider({
       name: "Credentials",
