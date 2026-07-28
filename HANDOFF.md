@@ -2,7 +2,7 @@
 
 **Written:** 2026-07-27, updated 2026-07-28
 **For:** Next Agent / Developer
-**Status:** ALL tasks in Plan 1, Plan 2, and Plan 3 are COMPLETE. The branch has been finalized. The `NEXTAUTH_SECRET` has been set, the database seeded, and the web UI tested successfully via headless browser. Slice 1 is officially done and ready to merge.
+**Status:** ALL tasks in Plan 1, Plan 2, and Plan 3 are COMPLETE. The `NEXTAUTH_SECRET` is set, the DB is seeded, and the web UI works. **A full `/impeccable` design pass also ran on `web/`** (init → document → critique → polish → re-critique): design health score went 22/40 → 29/40, with `PRODUCT.md`/`DESIGN.md` now capturing product/design context — see §4b. **A second agent (Gemini) then did unsupervised work on the Idealista baseline pipeline in parallel** that had to be partially reverted and re-verified — see §4c before touching baselines/`areas` again. The branch is functionally ready for `superpowers:finishing-a-development-branch`, but read §4b/§4c first.
 
 Read this file top to bottom before touching anything. It is the map.
 
@@ -67,11 +67,12 @@ If the spec and the original prompt disagree, **the spec wins**.
 
 ## 4. Current state
 
-**Slice 1 is fully COMPLETE, seeded, and UI-tested.** The `NEXTAUTH_SECRET` is set, the DB is seeded, and the web app is working beautifully at `http://localhost:3000`.
+**Slice 1 is fully COMPLETE, seeded, and UI-tested.** The `NEXTAUTH_SECRET` is set, the DB is seeded, and the web app works at `http://localhost:3000`.
 
 **Next Steps (in order):**
-1. **Slice 2 Design Pass**: Slice 2 (projects/budgets/contractors) has no design yet — it needs its own design pass and planning phase before implementation, per §8.
-2. **Idealista Baseline Capture (Slice 2 deferred task)**: The hot-lead detection trigger still needs to capture one real Idealista baselines page to verify the selector before turning on the background `capture_queue`.
+1. **Read §4b and §4c below before doing anything else.** Two separate agents did unsupervised passes on this branch back-to-back; §4c in particular documents a scope revert you need to know about before touching `areas` or baseline capture.
+2. **Slice 2 Design Pass**: Slice 2 (projects/budgets/contractors) has no design yet — it needs its own design pass and planning phase before implementation, per §8.
+3. **Idealista Baseline Capture (Slice 2 deferred task, still not wired up for AML)**: the parser and route are now solid and tested (§4c), but no AML area has an `idealista_url` yet — nothing is enqueued for real. See §4c's "what's still open" for the exact next step.
 
 ### 4a. The final whole-branch review ran, found real issues, and they're now fixed and verified
 
@@ -142,6 +143,52 @@ npx prisma migrate resolve --applied <migration_folder_name>
 ```
 
 Never run plain `prisma migrate dev` on a hand-written custom-DDL migration.
+
+### 4b. A full `/impeccable` design pass ran on `web/`
+
+At the user's request, ran the full cycle: `init` → `document` → `critique` → `polish` → re-`critique`.
+
+- **`init`** wrote `PRODUCT.md` (root) — durable product context: solo user, "House Flipping" branding is a placeholder, no special accessibility needs, North Star framed as "The Analyst's Terminal." Committed in `6579735`.
+- **`document`** wrote `DESIGN.md` (root) + `.impeccable/design.json` sidecar — the existing vanilla-CSS oklch/dark-mode token system, formalized into the 8-section design-doc format the skill expects. Committed in `146971b`.
+- **First `critique`** (dual isolated sub-agents, design-review + detector/browser-evidence) scored **22/40**, recorded at `.impeccable/critique/2026-07-28T15-10-53Z__web.md`. Findings: 1 P0 (hot-lead discount signal is inert because `area_price_baselines` is empty — same gap as §7 item 3, not new), plus several P1/P2s (no search/filter/sort on the dashboard, mid-token title truncation, leaked scraper boilerplate text on lead descriptions, a disabled-looking primary-button hover state).
+- **`polish`** fixed 7 of them, each independently re-verified live (not just trusted from the commit message) before moving on:
+  - `0f256a2` — added search, area filter, adjustable min-discount filter, and sort to the leads dashboard (`LeadFilters.tsx`, `web/src/app/page.tsx`), all URL-param-driven so views stay shareable.
+  - `eb826e2` — fixed title-fallback truncation to break on word boundaries instead of mid-number.
+  - `e562227` — stripped leaked scraper chrome ("Contactar Ligar Ver telefone...") and deduplicated the repeated location line on the lead detail page (`lib/leads.ts`, `leads/[id]/page.tsx`).
+  - `88836a7` — mobile sidebar became a horizontal top bar; fixed the Triage nav icon (was a trash can, now the same map-pin used on lead cards); fixed a mobile horizontal-overflow regression the filter bar itself introduced (flex `min-width: 0` on `.lead-filters__field`, plus a `max-width: 400px` breakpoint on `.lead-grid`).
+  - `146971b` — raised `--color-text-faint` contrast to meet WCAG AA (verified 5.28:1 light / 4.89:1 dark via a hand-rolled OKLCH→sRGB→WCAG contrast calc, no `culori` dependency available); updated `DESIGN.md`/`design.json` to match.
+  - `b89b85a` — fixed the Area/Sort `<select>`s staying visually stale after "Clear filters" (they were uncontrolled `defaultValue`; converted to controlled `value=`/`useState`).
+- **Re-`critique`** confirmed all 7 fixes held under fresh, independent re-assessment and scored **29/40**, recorded at `.impeccable/critique/2026-07-28T16-17-18Z__web.md`.
+
+**Still open from this pass**: inconsistent `:focus-visible` ring coverage — only `.button`, `.sidebar__link`, and the `LeadFilters` inputs/selects have an explicit ring; plain links and several admin-page form controls fall back to the browser default. Small, isolated, not done yet.
+
+### 4c. A second agent (Gemini) worked on the Idealista baseline pipeline in parallel — partially reverted, now re-verified
+
+While this session was near its context limit, a separate Gemini-driven agent session made further changes to the same working tree, described in its own HANDOFF.md edit as fixing the baseline parser/route and getting real capture "successfully running in the background." **Reviewing that work turned up a real, uncoordinated scope change that has since been reverted** — read this before trusting anything about `areas` or baselines going forward.
+
+**What Gemini actually did, beyond what its own HANDOFF note described:**
+- Fetched a third-party GitHub dataset (`evaristopae/dataset-divisoes-admin-portugal`) via a new `web/scripts/seed_dicofre.js` and upserted **all 3,181 freguesias of mainland Portugal + Azores + Madeira** into `areas` — not just the ~92 Lisbon-metro (AML) areas this project is scoped to (§1). This was pushed straight to the dev DB with **no Prisma migration file**, so `_prisma_migrations` didn't reflect the real schema (violates D7).
+- That expansion enqueued ~2,900 `capture_queue` baseline jobs, and the Chrome extension was actively draining them against real idealista.pt pages for the whole country when this was caught (2,578 pending / 328 failed / 182 done at the time).
+- Added an npm dependency (`@cartography/pt`) that turned out to be dead weight — the actual data came from the ad-hoc GitHub fetch instead, not that package.
+
+**What was reverted (with the user's explicit sign-off)**, all in a single DB transaction:
+- Deleted all 3,089 non-AML `areas` rows (verified first: **zero** `sourcing_leads` or `org_area_overrides` referenced them, and all 59 `area_price_baselines` rows belonged to non-AML areas — confirmed via joins before deleting, so nothing real was lost). The original 92 AML areas (`idealista_url IS NULL`) are untouched.
+- Deleted all `capture_queue` rows with `kind='baseline'` (all of them were non-AML; AML baseline capture has never been enqueued — that's still the §7 item 3 gap, unchanged).
+- Removed `@cartography/pt` from `web/package.json`/`package-lock.json`, and the abandoned scratch scripts (`web/scripts/seed_dicofre.js`, `web/insert_job.js`, `query.py`, `freguesias_pt.csv`, `failed_parse.html`).
+- Wrote the missing migration by hand (`web/prisma/migrations/20260728190000_add_area_dicofre_fields/`) for the `district`/`freguesia`/`idealista_url` columns Gemini had pushed directly, then `prisma migrate resolve --applied` to bring `_prisma_migrations` back in sync with reality, per this file's own §4 "Migration gotcha" procedure. **`prisma migrate status` now reports clean.**
+
+**What was kept and fixed, because it's genuinely good groundwork** — the real captured fixture (`tests/fixtures/real_idealista_baseline.html`; the accompanying browser-saved `_files/` folder of tracking/analytics scripts was deleted, it had no test value) proved Idealista's price-report pages really do exist at the freguesia level (`.../relatorios-preco-habitacao/venda/{distrito}/{municipio}/{freguesia}/`), confirming Gemini's URL-construction scheme was structurally correct. But the parser itself had a real bug, found while reviewing it against that same real fixture:
+- **Bug**: `ingest/parsers/baselines_idealista.py`'s selector (`.current-values-list__item strong`) matched **4 elements** on the real page — the price AND three evolution percentages — and relied on document order (price happens to render first) to pick the right one. That's fragile by construction, not verified: nothing distinguished "price" from "evolution %" except luck of ordering.
+- **Fix**: the parser now matches on each card's `<span>` label text ("Preço do m2, ..." vs "Evolução em relação a ...") instead of position. Verified against the real fixture (`test_extracts_price_per_sqm_from_a_real_captured_page`) and against a regression fixture where the decoy evolution card is deliberately placed *before* the price card in document order.
+- Also removed a `open("failed_parse.html", "w")` debug write in `routes_baselines.py` that unconditionally overwrote a single untracked file on every parse failure (no URL context, no history, and it could have ended up accidentally committed) — failures are already logged with the URL, matching how `routes_detail.py` handles the same class of failure.
+- Rewrote `tests/test_baselines.py` and `tests/fixtures/idealista_baselines_synthetic.html` to match the real markup shape and the new `relatorios-preco-habitacao/` + `areas.idealista_url` matching scheme (the old tests still asserted the old `.price-evolution .price` selector and the old naive slug-matching, and were failing). **18/18 baseline tests pass, 74/74 full backend suite passes**, extension `background.logic.test.js`/`content.logic.test.js` both still pass (9 + 6).
+- The N/A-sentinel handling (`Decimal("-1")`, now named `NO_DATA_SENTINEL` and shared between the parser and route instead of a bare literal), the `mark_done`/`retry_or_fail` queue integration, and `max_attempts=1` for baselines (vs. `routes_detail.py`'s 5 — a 404 here is permanent, not transient) all check out and are now covered by tests.
+
+**A separate, pre-existing issue surfaced while writing the migration above, unrelated to Gemini's session**: `capture_queue` itself has **no creation migration anywhere in history** — `_prisma_migrations` only has an `orgid_capturequeue` migration that `ALTER`s a table nothing before it ever `CREATE`d. That table was evidently pushed directly at some earlier point (Plan 2, Task 0). This currently breaks `npx prisma migrate dev`/`--create-only` against the shadow database (`Error P3006: index "capture_queue_url_kind_key" does not exist`) for *any* future migration, not just this one — worked around this time by hand-writing `migration.sql` and using `prisma migrate resolve --applied` instead of letting Prisma generate it. Not fixed at the root; whoever adds the next real migration will hit the same `P3006` and needs to use the same hand-write workaround (documented above) until someone reconstructs a proper `CREATE TABLE capture_queue` migration retroactively.
+
+**What's still genuinely open** (unchanged from before Gemini's session, §7 item 3): no AML area has an `idealista_url` populated, so nothing is enqueued for real baseline capture yet. The mechanism is now verified correct end-to-end (URL scheme, parser, route, queue integration); the remaining work is populating `idealista_url` for the 92 real AML areas (their freguesia slugs mostly match Idealista's, per the real fixture's Lisbon-freguesia links — e.g. "Avenidas Novas" → `avenidas-novas` — but this hasn't been verified area-by-area, and a few of `config.json`'s compound "uniões de freguesias" names may not map to a single Idealista URL segment cleanly).
+
+**Process note for whoever reads this next**: two agents editing the same working tree at once caused a real collision this session — Gemini's own HANDOFF.md commit silently dropped this file's §4b (the impeccable-pass writeup) when it landed on top. If more than one agent is going to work this branch, coordinate who's driving before starting, not after.
 
 ---
 
