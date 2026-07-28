@@ -308,7 +308,7 @@ model CaptureQueue {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  @@unique([url, kind])
+  @@unique([orgId, url, kind])
   @@index([orgId, state])
   @@map("capture_queue")
 }

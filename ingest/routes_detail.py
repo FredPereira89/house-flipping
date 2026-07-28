@@ -64,17 +64,21 @@ def _capture_photos(conn, lead_id: str, image_urls: list[str]) -> int:
     return inserted
 
 
-def _fail(url: str, message: str, status: int):
-    """Record a capture failure against the capture_queue row for this url
+def _fail(job_id: str, url: str, message: str, status: int, conn=None):
+    """Record a capture failure against the capture_queue row for this job_id
     and return the error response. Every path that doesn't reach 'done'
     must go through here -- otherwise the row claimed by get_pending_jobs
     (state='in_progress') is left stuck forever, which is the exact bug the
     Task 3 amendment calls out.
     """
     logger.warning("Detail capture failed for %s: %s", url, message)
-    with connection() as conn:
-        queue_repo.retry_or_fail(conn, url, message, MAX_ATTEMPTS)
-        conn.commit()
+    if job_id:
+        if conn:
+            queue_repo.retry_or_fail(conn, job_id, message, MAX_ATTEMPTS)
+        else:
+            with connection() as new_conn:
+                queue_repo.retry_or_fail(new_conn, job_id, message, MAX_ATTEMPTS)
+                new_conn.commit()
     return jsonify({"error": message}), status
 
 
@@ -84,21 +88,30 @@ def ingest_detail():
     body = request.get_json(silent=True) or {}
     url = body.get("url")
     html = body.get("html")
+    job_id = body.get("job_id")
     if not url or not html:
         return jsonify({"error": "url and html are required"}), 400
 
     if "idealista.pt" not in url:
-        return _fail(url, "unsupported portal", 400)
+        return _fail(job_id, url, "unsupported portal", 400)
 
     parsed = detail_idealista.parse_detail(url, html)
 
     try:
         with connection() as conn:
+            if job_id:
+                q_row = conn.execute("SELECT org_id FROM capture_queue WHERE id = %s", (job_id,)).fetchone()
+                if not q_row:
+                    return _fail(job_id, url, "job not found", 404, conn)
+                org_id = q_row["org_id"]
+            else:
+                return _fail(job_id, url, "job_id is required", 400, conn)
+
             row = conn.execute(
-                "SELECT id FROM sourcing_leads WHERE url = %s", (url,)
+                "SELECT id FROM sourcing_leads WHERE url = %s AND org_id = %s", (url, org_id)
             ).fetchone()
             if not row:
-                return _fail(url, "lead not found", 404)
+                return _fail(job_id, url, "lead not found", 404, conn)
             lead_id = row["id"]
 
             downloaded = _capture_photos(conn, lead_id, parsed["image_urls"])
@@ -108,12 +121,12 @@ def ingest_detail():
                 "WHERE id = %s",
                 (parsed["description"], lead_id),
             )
-            queue_repo.mark_done(conn, url)
+            queue_repo.mark_done(conn, job_id)
             conn.commit()
     except Exception as exc:  # noqa: BLE001 -- deliberately broad: any failure
         # here (network hiccup, disk error, DB error) must still retry/fail
         # the queue row rather than let the transaction rollback silently.
         logger.exception("Unhandled error capturing detail page %s", url)
-        return _fail(url, str(exc), 500)
+        return _fail(job_id, url, str(exc), 500)
 
     return jsonify({"status": "success", "downloaded": downloaded})

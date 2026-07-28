@@ -88,18 +88,19 @@ def _make_lead_and_queue_row(conn, url, external_id="det1"):
         """,
         (external_id, url),
     ).fetchone()["id"]
-    conn.execute(
+    queue_id = conn.execute(
         """
         INSERT INTO capture_queue (id, org_id, url, kind, state, enqueued_at, updated_at)
         VALUES (gen_random_uuid()::text, 'default-org', %s, 'detail', 'in_progress', now(), now())
+        RETURNING id
         """,
         (url,),
-    )
-    return lead_id
+    ).fetchone()["id"]
+    return lead_id, queue_id
 
 
 def test_requires_secret(client):
-    res = client.post("/ingest/detail", json={"url": URL, "html": "<html></html>"})
+    res = client.post("/ingest/detail", json={"url": URL, "html": "<html></html>", "job_id": "fake"})
     assert res.status_code == 401
 
 
@@ -107,18 +108,19 @@ def test_unsupported_portal_is_rejected_and_marks_queue(
     client, auth_headers, conn, clean_leads
 ):
     other_url = "https://example.com/imovel/1"
-    conn.execute(
+    queue_id = conn.execute(
         """
         INSERT INTO capture_queue (id, org_id, url, kind, state, enqueued_at, updated_at)
         VALUES (gen_random_uuid()::text, 'default-org', %s, 'detail', 'in_progress', now(), now())
+        RETURNING id
         """,
         (other_url,),
-    )
+    ).fetchone()["id"]
     conn.commit()
 
     res = client.post(
         "/ingest/detail",
-        json={"url": other_url, "html": "<html></html>"},
+        json={"url": other_url, "html": "<html></html>", "job_id": queue_id},
         headers=auth_headers,
     )
     assert res.status_code == 400
@@ -134,18 +136,19 @@ def test_lead_not_found_marks_queue_pending_for_retry(
     client, auth_headers, conn, clean_leads
 ):
     missing_url = "https://www.idealista.pt/imovel/99999999/"
-    conn.execute(
+    queue_id = conn.execute(
         """
         INSERT INTO capture_queue (id, org_id, url, kind, state, enqueued_at, updated_at)
         VALUES (gen_random_uuid()::text, 'default-org', %s, 'detail', 'in_progress', now(), now())
+        RETURNING id
         """,
         (missing_url,),
-    )
+    ).fetchone()["id"]
     conn.commit()
 
     res = client.post(
         "/ingest/detail",
-        json={"url": missing_url, "html": FIXTURE.read_text(encoding="utf-8")},
+        json={"url": missing_url, "html": FIXTURE.read_text(encoding="utf-8"), "job_id": queue_id},
         headers=auth_headers,
     )
     assert res.status_code == 404
@@ -162,7 +165,7 @@ def test_lead_not_found_marks_queue_pending_for_retry(
 def test_captures_description_and_photos(
     client, auth_headers, conn, clean_leads, monkeypatch, photo_cleanup
 ):
-    lead_id = _make_lead_and_queue_row(conn, URL)
+    lead_id, queue_id = _make_lead_and_queue_row(conn, URL)
     conn.commit()
     photo_cleanup.append(os.path.join("data", "photos", lead_id))
 
@@ -176,7 +179,7 @@ def test_captures_description_and_photos(
 
     res = client.post(
         "/ingest/detail",
-        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8")},
+        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8"), "job_id": queue_id},
         headers=auth_headers,
     )
     assert res.status_code == 200
@@ -214,7 +217,7 @@ def test_failed_download_does_not_block_other_photos_or_queue_completion(
     """A single bad image (404 from the CDN) must not sink the whole job --
     it's logged and skipped, the rest of the photos are still recorded, and
     the queue row still reaches 'done'."""
-    lead_id = _make_lead_and_queue_row(conn, URL)
+    lead_id, queue_id = _make_lead_and_queue_row(conn, URL)
     conn.commit()
     photo_cleanup.append(os.path.join("data", "photos", lead_id))
 
@@ -227,7 +230,7 @@ def test_failed_download_does_not_block_other_photos_or_queue_completion(
 
     res = client.post(
         "/ingest/detail",
-        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8")},
+        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8"), "job_id": queue_id},
         headers=auth_headers,
     )
     assert res.status_code == 200
@@ -242,7 +245,7 @@ def test_failed_download_does_not_block_other_photos_or_queue_completion(
 def test_exception_mid_capture_retries_then_escalates_to_failed(
     client, auth_headers, conn, clean_leads, monkeypatch, photo_cleanup
 ):
-    lead_id = _make_lead_and_queue_row(conn, URL)
+    lead_id, queue_id = _make_lead_and_queue_row(conn, URL)
     conn.commit()
     photo_cleanup.append(os.path.join("data", "photos", lead_id))
 
@@ -255,7 +258,7 @@ def test_exception_mid_capture_retries_then_escalates_to_failed(
     for expected_attempts in range(1, 5):
         res = client.post(
             "/ingest/detail",
-            json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8")},
+            json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8"), "job_id": queue_id},
             headers=auth_headers,
         )
         assert res.status_code == 500
@@ -269,7 +272,7 @@ def test_exception_mid_capture_retries_then_escalates_to_failed(
     # looping forever.
     res = client.post(
         "/ingest/detail",
-        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8")},
+        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8"), "job_id": queue_id},
         headers=auth_headers,
     )
     assert res.status_code == 500
@@ -301,7 +304,7 @@ def test_retry_after_partial_success_does_not_duplicate_photos(
     later failed on a different image), a retry must not re-insert a
     duplicate lead_photos row for it, but must still make forward progress
     on photos that weren't recorded yet."""
-    lead_id = _make_lead_and_queue_row(conn, URL)
+    lead_id, queue_id = _make_lead_and_queue_row(conn, URL)
     conn.commit()
     photo_cleanup.append(os.path.join("data", "photos", lead_id))
 
@@ -315,7 +318,7 @@ def test_retry_after_partial_success_does_not_duplicate_photos(
 
     first = client.post(
         "/ingest/detail",
-        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8")},
+        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8"), "job_id": queue_id},
         headers=auth_headers,
     )
     assert first.get_json()["downloaded"] == 2
@@ -326,7 +329,7 @@ def test_retry_after_partial_success_does_not_duplicate_photos(
     calls.clear()
     second = client.post(
         "/ingest/detail",
-        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8")},
+        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8"), "job_id": queue_id},
         headers=auth_headers,
     )
     assert second.status_code == 200
@@ -371,7 +374,7 @@ def test_retry_reinserts_a_photo_whose_row_was_rolled_back_but_file_survived(
     below on `downloaded == 2` / `len(photos) == 2` would instead see 1),
     and passes against the fix in routes_detail.py.
     """
-    lead_id = _make_lead_and_queue_row(conn, URL)
+    lead_id, queue_id = _make_lead_and_queue_row(conn, URL)
     conn.commit()
     photo_dir = os.path.join("data", "photos", lead_id)
     photo_cleanup.append(photo_dir)
@@ -388,7 +391,7 @@ def test_retry_reinserts_a_photo_whose_row_was_rolled_back_but_file_survived(
 
     first = client.post(
         "/ingest/detail",
-        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8")},
+        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8"), "job_id": queue_id},
         headers=auth_headers,
     )
     assert first.status_code == 500
@@ -419,7 +422,7 @@ def test_retry_reinserts_a_photo_whose_row_was_rolled_back_but_file_survived(
     )
     second = client.post(
         "/ingest/detail",
-        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8")},
+        json={"url": URL, "html": FIXTURE.read_text(encoding="utf-8"), "job_id": queue_id},
         headers=auth_headers,
     )
     assert second.status_code == 200
