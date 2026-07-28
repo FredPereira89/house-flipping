@@ -454,6 +454,13 @@ img, svg {
   );
 }
 
+/* Currently excluded from the main dashboard query (see page.tsx), but kept
+   so a rejected lead is never mistaken for a live one if it's ever rendered
+   elsewhere (e.g. a future "show rejected" view). */
+.lead-card--rejected {
+  opacity: 0.6;
+}
+
 .lead-card__header {
   display: flex;
   align-items: center;

@@ -56,7 +56,10 @@ export default function LeadCard({
   isDuplicate: boolean;
 }) {
   const isHot = lead.status === "hot_lead";
-  const isDisqualified = lead.status === "disqualified";
+  // Canonical enum (design spec §sourcing_leads.status, `ingest/app.py`) is
+  // evaluating/hot_lead/rejected/offer_made/acquired — "disqualified" never
+  // occurs and was dead code.
+  const isRejected = lead.status === "rejected";
 
   // Gross €/m² is the primary metric; fall back to useful area when a
   // listing only publishes usable (not gross) square meters.
@@ -70,14 +73,14 @@ export default function LeadCard({
 
   return (
     <article
-      className={`lead-card surface${isHot ? " lead-card--hot" : ""}`}
+      className={`lead-card surface${isHot ? " lead-card--hot" : ""}${isRejected ? " lead-card--rejected" : ""}`}
       aria-label={lead.title ?? "Untitled listing"}
     >
       <header className="lead-card__header">
         <div className="lead-card__badges">
           {isHot && <span className="badge badge--hot">Hot lead</span>}
-          {isDisqualified && (
-            <span className="badge badge--muted">Disqualified</span>
+          {isRejected && (
+            <span className="badge badge--muted">Rejected</span>
           )}
           {isDuplicate && <DuplicateBadge />}
         </div>

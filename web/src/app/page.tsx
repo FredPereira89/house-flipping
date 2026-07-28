@@ -52,9 +52,18 @@ export default async function HomePage() {
   const session = await requireSession();
   const orgId = session.user.orgId;
 
+  // Excludes `rejected` leads: this is a day-to-day triage view, and a
+  // rejected lead is a closed matter, not something to act on — before this
+  // fix it rendered identically to a live `evaluating`/`hot_lead` row with
+  // no visual distinction at all. Filtering with `not: "rejected"` (rather
+  // than an allow-list of "evaluating"/"hot_lead") deliberately still shows
+  // `offer_made`/`acquired` leads, since those represent active or won
+  // deals the user plausibly still wants visibility into here, not noise to
+  // hide. Add a dedicated "rejected" view/filter later if the reject pile
+  // ever needs to be revisited.
   const [leads, duplicateLeadIds] = await Promise.all([
     prisma.sourcingLead.findMany({
-      where: { orgId },
+      where: { orgId, status: { not: "rejected" } },
       orderBy: { lastSeenAt: "desc" },
       include: { area: true },
     }) as Promise<LeadWithArea[]>,
