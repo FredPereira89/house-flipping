@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import PhotoCarousel from "@/components/PhotoCarousel";
 import PriceHistoryGraph from "@/components/PriceHistoryGraph";
-import { displayTitle } from "@/lib/leads";
+import { cleanDescription, displayTitle } from "@/lib/leads";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 
@@ -105,6 +105,25 @@ export default async function LeadDetailPage({
 
   const isHot = lead.status === "hot_lead";
   const title = displayTitle(lead);
+
+  // Area name/municipality/raw-location-text regularly coincide (e.g. a
+  // seeded area whose municipality equals its own name, or a raw location
+  // string that's just the area's name) -- showing each value only once
+  // avoids "Campo de Ourique (Campo de Ourique) — Campo de Ourique".
+  const locationParts: string[] = [];
+  if (lead.area) {
+    locationParts.push(
+      lead.area.municipality && lead.area.municipality !== lead.area.name
+        ? `${lead.area.name} (${lead.area.municipality})`
+        : lead.area.name,
+    );
+  } else {
+    locationParts.push("Unassigned area");
+  }
+  if (lead.rawLocationText && lead.rawLocationText !== lead.area?.name) {
+    locationParts.push(lead.rawLocationText);
+  }
+  const locationLine = locationParts.join(" — ");
   const pricePerSqm = toNumber(lead.pricePerSqmGross ?? lead.pricePerSqmUseful);
   const baselinePricePerSqm = toNumber(baseline?.pricePerSqm);
   const priceLabel = toNumber(lead.price);
@@ -127,10 +146,7 @@ export default async function LeadDetailPage({
           <span className="lead-detail__portal">{lead.portal}</span>
         </div>
         <h1>{title}</h1>
-        <p className="lead-detail__area">
-          {lead.area ? `${lead.area.name} (${lead.area.municipality})` : "Unassigned area"}
-          {lead.rawLocationText ? ` — ${lead.rawLocationText}` : ""}
-        </p>
+        <p className="lead-detail__area">{locationLine}</p>
       </header>
 
       <PhotoCarousel leadId={lead.id} photos={lead.photos} title={title} />
@@ -225,7 +241,9 @@ export default async function LeadDetailPage({
           {/* `white-space: pre-wrap` (globals.css) preserves the
               multi-paragraph blank-line structure the ingest parser
               extracts, without needing to split/rejoin the string here. */}
-          <div className="lead-detail__description-text">{lead.description}</div>
+          <div className="lead-detail__description-text">
+            {cleanDescription(lead.description)}
+          </div>
         </section>
       )}
     </div>
