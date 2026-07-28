@@ -199,7 +199,7 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.alarms) {
     await chrome.storage.local.set({ lastQueueDepth: jobs ? jobs.length : 0 });
 
     if (jobs && jobs.length > 0) {
-      await openJobTab({ url: jobs[0].url, kind: jobs[0].kind });
+      await openJobTab({ jobId: jobs[0].id, url: jobs[0].url, kind: jobs[0].kind });
       return true; // Prioritize queued detail/baseline captures over search polling.
     }
 
@@ -212,9 +212,14 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.alarms) {
     const { searches } = await searchesRes.json();
 
     if (searches && searches.length > 0) {
+      const { searchIndex = 0 } = await chrome.storage.local.get("searchIndex");
+      const nextIndex = searchIndex >= searches.length ? 0 : searchIndex;
+      const search = searches[nextIndex];
+      await chrome.storage.local.set({ searchIndex: (nextIndex + 1) % searches.length });
+
       // One search at a time, so at most one capture tab is ever open and
       // each portal gets a slow, humanlike overall cadence.
-      await openJobTab({ url: searches[0].url, kind: "search" });
+      await openJobTab({ jobId: search.id, url: search.url, kind: "search" });
       return true;
     }
 
@@ -232,6 +237,7 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.alarms) {
     const now = new Date().toISOString();
     await setActiveJob({
       tabId: tab.id,
+      jobId: job.jobId,
       kind: job.kind,
       pageCount: 0,
       jobUrl: job.url,
@@ -276,12 +282,12 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.alarms) {
       // Not the tab background.js opened for the current job (e.g. plain
       // browsing on one of the matched domains, or a stray message from a
       // job that has already finished) -- stay passive.
-      return { kind: null, pageIndex: 0, maxSearchPages: MAX_SEARCH_PAGES };
+      return { jobId: null, kind: null, pageIndex: 0, maxSearchPages: MAX_SEARCH_PAGES };
     }
     job.pageCount += 1;
     job.lastCheckinAt = new Date().toISOString();
     await setActiveJob(job); // persists the new page count AND resets the watchdog clock
-    return { kind: job.kind, pageIndex: job.pageCount, maxSearchPages: MAX_SEARCH_PAGES };
+    return { jobId: job.jobId, kind: job.kind, pageIndex: job.pageCount, maxSearchPages: MAX_SEARCH_PAGES };
   }
 
   async function handleCaptureDone(tabId, success) {

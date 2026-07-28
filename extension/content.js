@@ -22,7 +22,7 @@ const PAGE_DELAY_MAX_MS = 7000;
 const FALLBACK_MAX_SEARCH_PAGES = 10; // used only if background didn't supply one
 
 function resolveEndpoint(url) {
-  if (url.includes("/imovel/")) return "/ingest/detail";
+  if (url.includes("/imovel/") || url.includes("/anuncio/")) return "/ingest/detail";
   if (url.includes("/estatisticas-imobiliarias/")) return "/ingest/baselines";
   return "/ingest/listings";
 }
@@ -86,13 +86,13 @@ function randomDelayMs(min, max) {
       try {
         chrome.runtime.sendMessage({ type: "GET_JOB_KIND" }, (response) => {
           if (chrome.runtime.lastError || !response) {
-            resolve({ kind: null, pageIndex: 0, maxSearchPages: FALLBACK_MAX_SEARCH_PAGES });
+            resolve({ jobId: null, kind: null, pageIndex: 0, maxSearchPages: FALLBACK_MAX_SEARCH_PAGES });
             return;
           }
           resolve(response);
         });
       } catch (err) {
-        resolve({ kind: null, pageIndex: 0, maxSearchPages: FALLBACK_MAX_SEARCH_PAGES });
+        resolve({ jobId: null, kind: null, pageIndex: 0, maxSearchPages: FALLBACK_MAX_SEARCH_PAGES });
       }
     });
   }
@@ -105,7 +105,7 @@ function randomDelayMs(min, max) {
   // task-2-report.md), so reporting a false "success" here would make a
   // failed capture indistinguishable from a real one instead of just an
   // untracked queue row.
-  async function postCurrentPage(secret) {
+  async function postCurrentPage(secret, jobId) {
     const url = window.location.href;
     const html = document.documentElement.outerHTML;
     const endpoint = resolveEndpoint(url);
@@ -117,7 +117,7 @@ function randomDelayMs(min, max) {
           "Content-Type": "application/json",
           "X-Ingest-Secret": secret,
         },
-        body: JSON.stringify({ url, html, captured_at: new Date().toISOString() }),
+        body: JSON.stringify({ url, html, captured_at: new Date().toISOString(), job_id: jobId }),
       });
       if (!res.ok) {
         console.error(`Houseflip capture: POST ${endpoint} returned ${res.status}`);
@@ -148,7 +148,7 @@ function randomDelayMs(min, max) {
   }
 
   async function run() {
-    const { kind, pageIndex, maxSearchPages } = await getJobInfo();
+    const { jobId, kind, pageIndex, maxSearchPages } = await getJobInfo();
 
     if (!kind) {
       // Not part of a background-orchestrated job -- do nothing (no POST,
@@ -158,7 +158,7 @@ function randomDelayMs(min, max) {
     }
 
     const secret = await getSecret();
-    const postOk = await postCurrentPage(secret);
+    const postOk = await postCurrentPage(secret, jobId);
 
     if (!shouldPaginate(kind, pageIndex, maxSearchPages)) {
       reportDone(postOk);
