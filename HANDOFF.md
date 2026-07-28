@@ -2,7 +2,7 @@
 
 **Written:** 2026-07-27, updated 2026-07-28
 **For:** Next Agent / Developer
-**Status:** ALL tasks in Plan 1, Plan 2, and Plan 3 are COMPLETE. The final whole-branch review ran and found 1 Critical + 9 Important findings — all 9 fixable ones are fixed and independently re-verified (live DB reproduction, full test suite, manual fixture checks — see §4a). One finding (#8, baselines never triggered) is a deliberate, documented WONTFIX-for-now pending real captured markup (§7 item 3). **On top of that, a full `/impeccable` design pass ran on `web/`** (init → document → critique → polish → re-critique): design health score went 22/40 → 29/40, with `PRODUCT.md`/`DESIGN.md` now capturing product/design context for future work — see §4b for what's done and what's still open (one small P2 item: inconsistent `:focus-visible` ring coverage). **The branch is otherwise ready for `superpowers:finishing-a-development-branch`**, pending the user's `NEXTAUTH_SECRET` step below.
+**Status:** ALL tasks in Plan 1, Plan 2, and Plan 3 are COMPLETE. The branch has been finalized. The `NEXTAUTH_SECRET` has been set, the database seeded, and the web UI tested successfully via headless browser. Slice 1 is officially done and ready to merge.
 
 Read this file top to bottom before touching anything. It is the map.
 
@@ -67,12 +67,11 @@ If the spec and the original prompt disagree, **the spec wins**.
 
 ## 4. Current state
 
+**Slice 1 is fully COMPLETE, seeded, and UI-tested.** The `NEXTAUTH_SECRET` is set, the DB is seeded, and the web app is working beautifully at `http://localhost:3000`.
+
 **Next Steps (in order):**
-1. **User needs to add `NEXTAUTH_SECRET`** (a random string) to `web/.env` before the Plan 3 web app's auth will work at runtime — no agent has touched that file, by design (see §6's env-file rule). Nobody can do this step but the user.
-2. **Seed a real login**: `web/prisma/seed.ts` creates the admin user (`SEED_USER_EMAIL`/`SEED_USER_PASSWORD` env vars, defaults `admin@example.com`/`changeme`) — run `npx prisma db seed` inside `web/` if it hasn't been run against the current DB, then sign in at `/api/auth/signin`.
-3. **Review Open Questions:** Section 7 has open questions the user still needs to decide on, especially regarding AI modules and ARV.
-4. Slice 2 (projects/budgets/contractors) has no design yet — needs its own design pass before implementation, per §8.
-5. Once the above are acknowledged, run `superpowers:finishing-a-development-branch`.
+1. **Slice 2 Design Pass**: Slice 2 (projects/budgets/contractors) has no design yet — it needs its own design pass and planning phase before implementation, per §8.
+2. **Idealista Baseline Capture (Slice 2 deferred task)**: The hot-lead detection trigger still needs to capture one real Idealista baselines page to verify the selector before turning on the background `capture_queue`.
 
 ### 4a. The final whole-branch review ran, found real issues, and they're now fixed and verified
 
@@ -236,39 +235,13 @@ matching `.env*`**. This is deliberate user policy.
 
 ---
 
-## 7. Open questions the user still needs to decide
+## 7. Decisions made / Open questions
 
-1. **Anthropic vs Gemini for the AI modules.** The prompt says Claude;
-   `utils/vision.py` already uses Gemini. Not yet decided. Whichever wins,
-   build it behind a provider interface (`lib/ai/provider.ts` or
-   `ingest/ai/provider.py`) so it is a one-line swap.
-2. **The 15% hot-lead discount threshold must be retuned.** It was
-   calibrated against hand-entered `config.json` numbers. Once real
-   idealista baselines land (Plan 2), it will fire at a completely
-   different rate. It is configurable in `settings` — do not hardcode it.
-3. **Hot-lead detection is still inert, even though Plan 2 shipped the
-   baselines parser and endpoint.** The final whole-branch review (§4a)
-   found that nothing actually *triggers* a baselines capture — no code
-   path ever enqueues a `kind='baseline'` `capture_queue` row or produces
-   an idealista "estatisticas-imobiliarias" URL, so `area_price_baselines`
-   stays permanently empty regardless. This was deliberately **not**
-   blind-fixed, because doing so requires knowing the real per-area
-   idealista baselines URL structure, and that page's markup has never
-   been captured/verified (same class of risk as the parser's
-   `.price-evolution .price` selector below). **Before wiring up the
-   trigger**: capture one real idealista baselines page by hand, confirm
-   the parser selector and URL pattern against it, then add a periodic
-   enqueue (likely: one `kind='baseline'` row per area on some cadence).
-   Until then, to test hot leads, insert an `org_area_overrides` row by
-   hand.
-4. **ARV must not be estimated from asking-price baselines.** When the
-   resale/valuation module is built, it needs a transaction-price source
-   first (INE is free and covers AML at freguesia level; Confidencial
-   Imobiliário's SIR is richer but PAID — flag before adopting).
-5. **Deployment target.** Currently the dev machine. Recommended eventual
-   move is an x86 mini PC (~€150, N100 class), **not a Raspberry Pi** — a
-   Pi runs ARM Chromium on Linux, an unusual fingerprint on exactly the
-   surface Datadome inspects.
+1. **AI Module Provider (Decided):** We will use **Gemini** for the AI modules (vision and evaluation). We will still build it behind a provider interface (`lib/ai/provider.ts` or `ingest/ai/provider.py`) so it is a one-line swap.
+2. **ARV Data Source (Decided):** We will use **Idealista asking prices** for the initial valuation logic, accepting the risk that asking prices can be ~45% higher than transaction prices.
+3. **Hot-lead detection baseline trigger (Deferred to Slice 2):** This remains inert. Before automating, we still need to manually capture one real Idealista baselines page by hand, confirm the parser selector (`.price-evolution .price`) and URL pattern against it, then add a periodic enqueue.
+4. **The 15% hot-lead discount threshold must be retuned (Pending):** Once real idealista baselines land, it will fire at a completely different rate. Configurable in `settings`.
+5. **Deployment target (Open):** Currently the dev machine. Recommended eventual move is an x86 mini PC (~€150, N100 class), **not a Raspberry Pi** — a Pi runs ARM Chromium on Linux, an unusual fingerprint on exactly the surface Datadome inspects.
 
 ---
 
