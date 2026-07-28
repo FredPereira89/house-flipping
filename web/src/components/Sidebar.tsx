@@ -30,14 +30,20 @@ const NAV_ITEMS: NavItem[] = [
     id: "nav-link-triage",
     href: "/triage",
     label: "Triage",
+    // A map pin, not the trash-can silhouette this used to be -- Triage's
+    // entire job is assigning an area (location) to unmatched leads, and a
+    // pin is the same location metaphor LeadCard already uses elsewhere in
+    // this app, not a new icon language. The old trash-can shape read as
+    // "delete" at exactly the spot a new/returning user needs the least
+    // ambiguity.
     icon: (
       <svg className="sidebar__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path
-          d="M9 4h6l1 3h4v2H4V7h4l1-3Z M6 9h12l-1 11H7L6 9Z"
+          d="M12 21s-7-5.5-7-11a7 7 0 1 1 14 0c0 5.5-7 11-7 11Z"
           stroke="currentColor"
           strokeWidth="1.6"
-          strokeLinejoin="round"
         />
+        <circle cx="12" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.6" />
       </svg>
     ),
   },
@@ -105,7 +111,7 @@ export default function Sidebar() {
         <span className="sidebar__brand-mark" aria-hidden="true">
           HF
         </span>
-        House Flipping
+        <span className="sidebar__brand-name">House Flipping</span>
       </Link>
 
       <ul
@@ -129,9 +135,10 @@ export default function Sidebar() {
                     : "sidebar__link"
                 }
                 aria-current={isActive ? "page" : undefined}
+                title={item.label}
               >
                 {item.icon}
-                {item.label}
+                <span className="sidebar__link-label">{item.label}</span>
               </Link>
             </li>
           );
