@@ -1,25 +1,32 @@
 <!--
-SYNTHETIC FIXTURE -- this is NOT a captured page. It is a minimal, hand-built
-HTML snippet that exercises the ".price-evolution .price" selector
-baselines_idealista.parse_baselines relies on.
+SYNTHETIC FIXTURE, but its shape is now verified: it mirrors the DOM of
+tests/fixtures/real_idealista_baseline.html, a genuine capture of
+https://www.idealista.pt/media/relatorios-preco-habitacao/venda/lisboa/lisboa/
+That real page repeats the same ".current-values-list__item" card for the
+current price AND for month-over-month/year-over-year evolution
+percentages, distinguished only by the sibling <span> label. The decoy
+evolution card below is deliberate: it comes BEFORE the price card in
+document order, so a selector that just grabbed the first
+".current-values-list__item strong" (instead of matching the "Preço"
+label) would silently read "- 0,3 %" as the price instead of failing loud.
 
-UNVERIFIED: nobody on this project has ever captured a real Idealista
-"estatisticas-imobiliarias" (price-report) page. tests/fixtures/
-idealista_search.html is a real capture, but of a SEARCH-RESULTS page, which
-tells us nothing about this page type's actual DOM. Do not treat this file
-as a real Idealista capture the way debug_page.html was once mistaken for
-one -- there is no genuine idealista.pt price-report fixture in this repo
-yet, and the ".price-evolution .price" selector must be checked against a
-real capture before this endpoint is trusted in production.
-
-The price text below deliberately uses Portuguese-style formatting (a '.'
-thousands separator and a ',' decimal separator, plus a currency/unit
-suffix) to exercise the parser's digit/comma stripping.
+The price text uses Portuguese-style formatting (a '.' thousands separator
+and a ',' decimal separator, plus a currency/unit suffix) to exercise the
+parser's digit/comma stripping.
 -->
 <html>
   <body>
-    <div class="price-evolution">
-      <span class="price">2.345,67 &euro;/m&sup2;</span>
+    <div class="current-values-list__item">
+      <div class="row-inner">
+        <strong>- 0,3 %</strong>
+        <span>Evolução em relação a maio 2026</span>
+      </div>
+    </div>
+    <div class="current-values-list__item">
+      <div class="row-inner">
+        <strong>2.345,67 &euro;/m&sup2;</strong>
+        <span>Preço do m2, Lisboa a junho 2026</span>
+      </div>
     </div>
   </body>
 </html>
