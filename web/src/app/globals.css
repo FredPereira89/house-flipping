@@ -626,6 +626,194 @@ img, svg {
   gap: var(--space-2);
 }
 
+/* ---- Lead detail page ---- */
+
+.lead-detail__back {
+  display: inline-block;
+  margin-bottom: var(--space-5);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+
+  &:hover {
+    color: var(--color-brand);
+  }
+}
+
+.lead-detail__header {
+  margin-bottom: var(--space-5);
+}
+
+.lead-detail__badges {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.lead-detail__portal {
+  font-size: var(--fs-xs);
+  color: var(--color-text-faint);
+  text-transform: capitalize;
+}
+
+.lead-detail__area {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.lead-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-5);
+  margin-top: var(--space-5);
+
+  @media (max-width: 720px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lead-detail__stats,
+.lead-detail__baseline,
+.lead-detail__price-history,
+.lead-detail__description {
+  padding: var(--space-5);
+}
+
+.lead-detail__price-history,
+.lead-detail__description {
+  margin-top: var(--space-5);
+}
+
+.lead-detail__stats-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+
+.lead-detail__stat {
+  dt {
+    font-size: var(--fs-xs);
+    color: var(--color-text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  dd {
+    margin: 0;
+    font-size: var(--fs-base);
+    font-weight: 600;
+    color: var(--color-text);
+  }
+}
+
+.lead-detail__source-link {
+  margin-top: var(--space-2);
+}
+
+.lead-detail__baseline-empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.lead-detail__baseline-source {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.lead-detail__description-text {
+  margin: 0;
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+}
+
+/* ---- Photo carousel (native CSS scroll-snap, no JS library) ---- */
+
+.photo-carousel {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  border-radius: var(--radius-lg);
+  scrollbar-width: thin;
+}
+
+.photo-carousel__item {
+  flex: 0 0 min(100%, 32rem);
+  scroll-snap-align: center;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
+}
+
+.photo-carousel--empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  aspect-ratio: 16 / 7;
+  color: var(--color-text-faint);
+}
+
+.photo-carousel__placeholder-icon {
+  width: 3rem;
+  height: 3rem;
+}
+
+.photo-carousel__placeholder-text {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+/* ---- Price history graph (hand-rolled inline SVG, no charting lib) ---- */
+
+.price-history__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.price-history__svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.price-history__line {
+  stroke: var(--color-brand);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.price-history__dot {
+  fill: var(--color-brand-strong);
+}
+
+.price-history__legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.price-history__trend--down {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.price-history__trend--up {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
