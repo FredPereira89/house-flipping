@@ -309,10 +309,12 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.alarms) {
       });
     }
     await closeTab(tabId);
-    // Try the next job immediately instead of waiting out the rest of the
-    // 2-minute alarm period. If this worker gets evicted before it starts,
-    // the next scheduled capture-loop tick picks up any remaining work.
-    runCaptureLoop();
+    // Add a 5 second delay before the next job to avoid anti-bot rate limits
+    // (like Fastly 429s from Idealista). If the worker gets evicted during this,
+    // the next 2-minute alarm will pick it up.
+    setTimeout(() => {
+      runCaptureLoop();
+    }, 5000);
   }
 }
 

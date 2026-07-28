@@ -23,7 +23,7 @@ const FALLBACK_MAX_SEARCH_PAGES = 10; // used only if background didn't supply o
 
 function resolveEndpoint(url) {
   if (url.includes("/imovel/") || url.includes("/anuncio/")) return "/ingest/detail";
-  if (url.includes("/estatisticas-imobiliarias/")) return "/ingest/baselines";
+  if (url.includes("/estatisticas-imobiliarias/") || url.includes("/media/relatorios-preco-habitacao/")) return "/ingest/baselines";
   return "/ingest/listings";
 }
 
