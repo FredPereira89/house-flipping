@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Area, SourcingLead } from "@prisma/client";
 
 import DuplicateBadge from "@/components/DuplicateBadge";
+import { displayTitle } from "@/lib/leads";
 
 export type LeadWithArea = SourcingLead & { area: Area | null };
 
@@ -70,11 +71,12 @@ export default function LeadCard({
   const discountLabel = formatDiscount(lead.discountPct);
   const discountValue = toNumber(lead.discountPct);
   const areaLabel = lead.area ? lead.area.name : "Unassigned";
+  const title = displayTitle(lead);
 
   return (
     <article
       className={`lead-card surface${isHot ? " lead-card--hot" : ""}${isRejected ? " lead-card--rejected" : ""}`}
-      aria-label={lead.title ?? "Untitled listing"}
+      aria-label={title}
     >
       <header className="lead-card__header">
         <div className="lead-card__badges">
@@ -88,9 +90,7 @@ export default function LeadCard({
       </header>
 
       <h3 className="lead-card__title">
-        <Link href={`/leads/${lead.id}`}>
-          {lead.title ?? "Untitled listing"}
-        </Link>
+        <Link href={`/leads/${lead.id}`}>{title}</Link>
       </h3>
 
       <p className="lead-card__area">

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import PhotoCarousel from "@/components/PhotoCarousel";
 import PriceHistoryGraph from "@/components/PriceHistoryGraph";
+import { displayTitle } from "@/lib/leads";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 
@@ -70,7 +71,7 @@ export async function generateMetadata({
   }
 
   return {
-    title: lead.title ?? "Untitled listing",
+    title: displayTitle(lead),
     description: lead.rawLocationText
       ? `Property lead in ${lead.rawLocationText}.`
       : "Property lead details.",
@@ -103,7 +104,7 @@ export default async function LeadDetailPage({
     : null;
 
   const isHot = lead.status === "hot_lead";
-  const title = lead.title ?? "Untitled listing";
+  const title = displayTitle(lead);
   const pricePerSqm = toNumber(lead.pricePerSqmGross ?? lead.pricePerSqmUseful);
   const baselinePricePerSqm = toNumber(baseline?.pricePerSqm);
   const priceLabel = toNumber(lead.price);
