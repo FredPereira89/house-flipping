@@ -86,9 +86,12 @@ model VerificationToken {
 model Area {
   id           String   @id @default(cuid())
   name         String
+  district     String?
   municipality String
+  freguesia    String?
   slug         String   @unique
   aliases      String[]
+  idealistaUrl String?  @map("idealista_url")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
