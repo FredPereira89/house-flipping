@@ -67,6 +67,11 @@ def parse(url: str, html: str) -> list[ParsedListing]:
 
             description = card.get_text(separator=" ").strip()
 
+            area_sqm_gross = None
+            area_match = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:m2|m²|m\^2)", description, re.IGNORECASE)
+            if area_match:
+                area_sqm_gross = _to_decimal(area_match.group(1))
+
             image_urls = []
             img = card.find("img")
             if img and img.get("src"):
@@ -80,7 +85,7 @@ def parse(url: str, html: str) -> list[ParsedListing]:
                     title=title,
                     description=description,
                     price=price,
-                    area_sqm_gross=None,  # Not typically visible in OLX search cards
+                    area_sqm_gross=area_sqm_gross,
                     typology=typology,
                     raw_location_text=location,
                     image_urls=image_urls,
