@@ -2,7 +2,7 @@
 
 **Written:** 2026-07-27, updated 2026-07-28
 **For:** Next Agent / Developer
-**Status:** ALL 13 Tasks in Plan 1 are COMPLETE. All Tasks in Plan 2 are COMPLETE. All 5 Tasks in Plan 3 (Next.js web app) are COMPLETE. **The mandatory final whole-branch review across all three plans has NOT been done yet** — see §4a, this is the concrete next step, not a completed one.
+**Status:** ALL tasks in Plan 1, Plan 2, and Plan 3 are COMPLETE. The final whole-branch review ran and found 1 Critical + 9 Important findings — all 9 fixable ones are now fixed and independently re-verified (live DB reproduction, full test suite, manual fixture checks — see §4a). One finding (#8, baselines never triggered) is a deliberate, documented WONTFIX-for-now pending real captured markup (§7 item 3). **The branch is otherwise ready for `superpowers:finishing-a-development-branch`**, pending the user's `NEXTAUTH_SECRET` step below.
 
 Read this file top to bottom before touching anything. It is the map.
 
@@ -68,26 +68,28 @@ If the spec and the original prompt disagree, **the spec wins**.
 ## 4. Current state
 
 **Next Steps (in order):**
-1. **Run the final whole-branch code review** (see §4a immediately below) — this was dispatched once already (on 2026-07-27) and got interrupted by a session/API limit before producing a single finding. It has still never actually run. Do this before anything else, and definitely before merging/finishing this branch.
-2. **User needs to add `NEXTAUTH_SECRET`** (a random string) to `web/.env` before the Plan 3 web app's auth will work at runtime — no agent has touched that file, by design (see §6's env-file rule). Nobody can do this step but the user.
-3. **Seed a real login**: `web/prisma/seed.ts` creates the admin user (`SEED_USER_EMAIL`/`SEED_USER_PASSWORD` env vars, defaults `admin@example.com`/`changeme`) — run `npx prisma db seed` inside `web/` if it hasn't been run against the current DB, then sign in at `/api/auth/signin`.
-4. **Review Open Questions:** Section 7 has open questions the user still needs to decide on, especially regarding AI modules and ARV.
-5. Slice 2 (projects/budgets/contractors) has no design yet — needs its own design pass before implementation, per §8.
+1. **User needs to add `NEXTAUTH_SECRET`** (a random string) to `web/.env` before the Plan 3 web app's auth will work at runtime — no agent has touched that file, by design (see §6's env-file rule). Nobody can do this step but the user.
+2. **Seed a real login**: `web/prisma/seed.ts` creates the admin user (`SEED_USER_EMAIL`/`SEED_USER_PASSWORD` env vars, defaults `admin@example.com`/`changeme`) — run `npx prisma db seed` inside `web/` if it hasn't been run against the current DB, then sign in at `/api/auth/signin`.
+3. **Review Open Questions:** Section 7 has open questions the user still needs to decide on, especially regarding AI modules and ARV.
+4. Slice 2 (projects/budgets/contractors) has no design yet — needs its own design pass before implementation, per §8.
+5. Once the above are acknowledged, run `superpowers:finishing-a-development-branch`.
 
-### 4a. The final whole-branch review is still outstanding — read this before assuming Plan 1-3 are "done and clean"
+### 4a. The final whole-branch review ran, found real issues, and they're now fixed and verified
 
-Every task in Plan 1, Plan 2, and Plan 3 has been implemented and passed its own **task-scoped** review (an SDD review of just that task's diff). What has **never** happened is the final review of the **whole branch together** — checking cross-task/cross-plan consistency, whether Plan 1's Tasks 4-13 and Plan 2's Tasks 0-1 (which were built by an earlier session outside this repo's SDD review loop entirely) hold up under the same scrutiny everything since has gotten, and whether the three plans compose correctly end-to-end.
+The final whole-branch review generated `.superpowers/sdd/final-review-2026-07-28/FINDINGS.md`: 1 Critical + 9 Important findings, split into four fix groups (A/B/C/D). Fix commits landed across two sessions (some subagents dispatched for this hit a session/API limit mid-task and had to be picked back up):
 
-This was dispatched once (2026-07-27, opus model) with a comprehensive prompt covering the spec's D1-D13 decisions, the project's lossless-parsing/silent-failure conventions, and a specific instruction to check whether `tests/test_queue.py`'s flaky-vs-deterministic failure behavior is a real concurrency bug — but the subagent hit a session/API limit and was terminated **before reading anything or producing a single finding**. Nothing from that attempt should be treated as a completed review.
+- **Group C** (`ad7305d`, `a62c4e4`) — web status-string mismatch (#7), triage alias-learning writing into global `Area` data (#9).
+- **Groups A/B/D** (`7e1e157`, `380ffe9`, `ed7cbc0`, `c3dd653`) — the Critical queue over-claim bug + keying job completion by row id (#1, #5), ingest-side org-scoping + `CaptureQueue` unique constraint (#6), search rotation + olx/imovirtual detail routing (#3 partial, #4), OLX `area_sqm_gross` parsing (#10), `migrate_csv.py`'s real CSV format (#2).
 
-Everything needed to redo it is on disk:
-- **Ledger for Plan 1 + Plan 2**: `.superpowers/sdd/2026-07-27-slice1-plan2-capture/progress.md` — full history of every finding/fix across those two plans.
-- **Ledger for Plan 3**: `.superpowers/sdd/2026-07-27-slice1-plan3-webapp/progress.md` — full history for the web app, including the pre-implementation amendment and all 5 task reviews (zero fix rounds needed, but read the parked/deferred minors listed at the bottom).
-- **Pre-built review package (Plan 1+2 only, needs regenerating to also cover Plan 3)**: `.superpowers/sdd/2026-07-27-slice1-plan2-capture/review-180ae5e..0828722-code-only.diff` — deliberately excludes bulk fixture HTML/lockfiles from the diff body. Regenerate a fresh one covering `180ae5e..<current HEAD>` before dispatching, since Plan 3 (5 more commits) isn't in this file yet.
-- Never-before-reviewed files flagged as worth extra scrutiny: `ingest/area_matcher.py`, `ingest/disqualify.py`, `ingest/evaluate.py`, `ingest/parsers/idealista.py`, the `/ingest/listings` endpoint, `scripts/migrate_csv.py` (all from Plan 1's externally-built tasks).
-- Two specific "unverified against real markup" risks to flag prominently to whoever does the review: `baselines_idealista.py`'s `.price-evolution .price` selector, and the naive URL-slug-to-area-slug matching in the same file — neither has ever been tested against a real captured idealista page.
+Every fix was independently re-verified against the actual code and a live DB/test run, not just trusted from the implementer's own report:
+- `tests/test_queue.py` run 5 consecutive times: all pass (previously 3/5 failures per the review's own repro).
+- `scripts/migrate_csv.py`'s corrected logic run against the real `data/imoveis_extraidos.csv` in a rolled-back transaction against the live dev DB: 731/731 rows, 0 errors — matching HANDOFF's original claim for the first time.
+- Full backend suite: 69/69 passing. Extension's plain-Node logic tests (`background.logic.test.js`, `content.logic.test.js`): all passing, plus a manual check of `resolveEndpoint()` against real OLX/imovirtual fixture hrefs (not just the pre-existing test's contrived URL).
+- `npx prisma migrate status` confirms the new `CaptureQueue` unique-constraint migration is applied and the schema is in sync.
 
-**Do not report Plan 1/2/3 as fully reviewed or production-safe until this actually runs.**
+**Only remaining open item from the review**: #8 (nothing triggers a baselines capture) — deliberately left as a WONTFIX-for-now, see §7 item 3. #3's fix is partial: search rotation and the queue-poisoning risk are fixed, but `saved_searches.schedule` is still not read for per-search cadence (smaller, non-security gap).
+
+Full per-finding detail (what broke, what the fix does, how it was verified) is in `.superpowers/sdd/final-review-2026-07-28/FINDINGS.md`.
 
 **Done in Plan 3 (All 5/5 tasks) — Next.js web app, `web/`:**
 - **Task 0** — Next.js App Router scaffold, vanilla-CSS design-token system (oklch colors, dark mode, restrained motion — no Tailwind), Prisma client generation.
@@ -227,12 +229,21 @@ matching `.env*`**. This is deliberate user policy.
    calibrated against hand-entered `config.json` numbers. Once real
    idealista baselines land (Plan 2), it will fire at a completely
    different rate. It is configurable in `settings` — do not hardcode it.
-3. **Hot-lead detection is inert until Plan 2.** There are no
-   `area_price_baselines` rows yet, so `get_baseline()` returns `None`,
-   `discount_pct` is `None`, and nothing is flagged. This is correct and
-   intentional — the old hardcoded numbers were deliberately not carried
-   over. To test hot leads before Plan 2, insert an `org_area_overrides`
-   row by hand.
+3. **Hot-lead detection is still inert, even though Plan 2 shipped the
+   baselines parser and endpoint.** The final whole-branch review (§4a)
+   found that nothing actually *triggers* a baselines capture — no code
+   path ever enqueues a `kind='baseline'` `capture_queue` row or produces
+   an idealista "estatisticas-imobiliarias" URL, so `area_price_baselines`
+   stays permanently empty regardless. This was deliberately **not**
+   blind-fixed, because doing so requires knowing the real per-area
+   idealista baselines URL structure, and that page's markup has never
+   been captured/verified (same class of risk as the parser's
+   `.price-evolution .price` selector below). **Before wiring up the
+   trigger**: capture one real idealista baselines page by hand, confirm
+   the parser selector and URL pattern against it, then add a periodic
+   enqueue (likely: one `kind='baseline'` row per area on some cadence).
+   Until then, to test hot leads, insert an `org_area_overrides` row by
+   hand.
 4. **ARV must not be estimated from asking-price baselines.** When the
    resale/valuation module is built, it needs a transaction-price source
    first (INE is free and covers AML at freguesia level; Confidencial
