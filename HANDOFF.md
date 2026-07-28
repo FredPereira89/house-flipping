@@ -205,6 +205,23 @@ docker compose up -d db
 docker compose exec db psql -U houseflip -d houseflip -c "\dt"
 ```
 
+### Test-suite gotcha — `pytest` against the dev DB wipes lead data
+
+There is no separate test database in this project — `tests/conftest.py`
+just reads `DATABASE_URL` like anything else, and its `clean_leads`
+fixture (used by the detail-capture/queue tests) does `DELETE FROM
+sourcing_leads` plus `lead_price_history`, `lead_tags`, `capture_runs`,
+`alerts`, `capture_queue`, `saved_searches` for isolation between test
+runs. Pointing `DATABASE_URL` at the same `houseflip` dev DB you've been
+clicking through in the browser and running `pytest tests/` **deletes
+every migrated/captured lead** (this happened once, 2026-07-28 — the 731
+CSV-migrated leads were wiped mid-session and had to be re-migrated).
+`users`, `areas`, `settings`, and `disqualify_keywords` are untouched
+(not in that fixture's cleanup list), but leads are not recoverable
+unless you have another source to re-run (the CSV migration, in this
+case). **Use a disposable/throwaway Postgres DB for test runs**, not the
+one holding real data.
+
 ### Environment-file gotcha — read this
 
 The tooling in this environment **hard-denies reading or writing any path
