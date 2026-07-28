@@ -34,6 +34,8 @@ export default function LeadFilters({
   const [minDiscount, setMinDiscount] = useState(
     searchParams.get("minDiscount") ?? "",
   );
+  const [area, setArea] = useState(searchParams.get("area") ?? "");
+  const [sort, setSort] = useState(searchParams.get("sort") ?? "discount");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateParam = useCallback(
@@ -106,8 +108,11 @@ export default function LeadFilters({
         <label htmlFor="lead-area">Area</label>
         <select
           id="lead-area"
-          defaultValue={searchParams.get("area") ?? ""}
-          onChange={(e) => updateParam("area", e.target.value)}
+          value={area}
+          onChange={(e) => {
+            setArea(e.target.value);
+            updateParam("area", e.target.value);
+          }}
         >
           <option value="">All areas</option>
           {areas.map((area) => (
@@ -122,8 +127,11 @@ export default function LeadFilters({
         <label htmlFor="lead-sort">Sort by</label>
         <select
           id="lead-sort"
-          defaultValue={searchParams.get("sort") ?? "discount"}
-          onChange={(e) => updateParam("sort", e.target.value)}
+          value={sort}
+          onChange={(e) => {
+            setSort(e.target.value);
+            updateParam("sort", e.target.value);
+          }}
         >
           {SORT_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -140,6 +148,8 @@ export default function LeadFilters({
           onClick={() => {
             setQ("");
             setMinDiscount("");
+            setArea("");
+            setSort("discount");
             router.replace(pathname, { scroll: false });
           }}
         >
