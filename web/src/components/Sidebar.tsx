@@ -42,6 +42,27 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    id: "nav-link-alerts",
+    href: "/alerts",
+    label: "Alerts",
+    icon: (
+      <svg className="sidebar__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M12 3.5c-1 0-1.8.8-1.8 1.8v.4C7.7 6.3 6 8.6 6 11.3V15l-1.6 2.4c-.3.4 0 1 .5 1h14.2c.5 0 .8-.6.5-1L18 15v-3.7c0-2.7-1.7-5-4.2-5.6v-.4c0-1-.8-1.8-1.8-1.8Z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M10 20a2 2 0 0 0 4 0"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
     id: "nav-link-saved-searches",
     href: "/admin/searches",
     label: "Saved Searches",
