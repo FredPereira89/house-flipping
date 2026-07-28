@@ -7,6 +7,19 @@ const TITLE_FALLBACK_LENGTH = 80;
 // description that doesn't start with either.
 const PHOTO_COUNTER_RE = /^\d+\s*\/\s*\d+\s*/;
 const MAP_DISCLAIMER_RE = /^localiza[çc][ãa]o aproximada\.\s*/i;
+const TRAILING_NUMERIC_FRAGMENT_RE = /(?:\s+[\d.,€$]+)+$/;
+
+/** A hard character-count cutoff regularly landed mid-number or mid-word
+ * (e.g. "...Campo de Ourique 239.00…") -- reads as corrupted data rather
+ * than a truncated one. Cuts at the last whitespace boundary within the
+ * limit instead, then also drops a trailing numeric-only fragment (a lone
+ * cut-off price/area number is still confusing even at a word boundary). */
+function truncateAtWordBoundary(text: string, limit: number): string {
+  const slice = text.slice(0, limit);
+  const lastSpace = slice.lastIndexOf(" ");
+  const atWordBoundary = lastSpace > 0 ? slice.slice(0, lastSpace) : slice;
+  return atWordBoundary.replace(TRAILING_NUMERIC_FRAGMENT_RE, "").trimEnd();
+}
 
 /** Some sources (the historical CSV migration) never had a distinct title
  * field, only a raw scraped description blob. Falling back to a truncated
@@ -25,7 +38,7 @@ export function displayTitle(lead: {
       .replace(MAP_DISCLAIMER_RE, "");
     if (normalized) {
       return normalized.length > TITLE_FALLBACK_LENGTH
-        ? `${normalized.slice(0, TITLE_FALLBACK_LENGTH)}…`
+        ? `${truncateAtWordBoundary(normalized, TITLE_FALLBACK_LENGTH)}…`
         : normalized;
     }
   }

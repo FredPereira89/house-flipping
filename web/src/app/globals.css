@@ -298,7 +298,12 @@ img, svg {
   color: white;
   box-shadow: var(--shadow-sm);
 
+  /* `.button:hover`'s `background: var(--color-border)` outranks this rule's
+     own resting `background` by specificity (0,2,0 vs 0,1,0) unless hover
+     re-asserts the gradient here too -- without this, every primary button
+     silently washed out to near-white-on-white on hover. */
   &:hover {
+    background: var(--gradient-brand);
     box-shadow: var(--shadow-md);
   }
 }
