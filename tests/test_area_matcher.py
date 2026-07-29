@@ -43,3 +43,21 @@ def test_prefers_longest_match_when_several_hit():
 
 def test_returns_none_when_nothing_matches():
     assert match_area("Rua Qualquer, Bragança", AREAS) is None
+
+
+def test_prefers_aml_area_on_alias_tie_with_a_same_name_freguesia():
+    # "Alvalade" exists in both Lisboa (AML) and Santiago do Cacém (not
+    # AML). Portal listing text never states the concelho, so this is a
+    # genuine, irreducible tie on alias text alone -- resolve it toward
+    # the area this tool actually sources leads in.
+    areas = [
+        {"id": "lisboa-alvalade", "name": "Alvalade",
+         "municipality": "Lisboa",
+         "aliases": ["Alvalade", "alvalade"]},
+        {"id": "cacem-alvalade", "name": "Alvalade, Santiago do Cacém, Setúbal",
+         "municipality": "Santiago do Cacém",
+         "aliases": ["Alvalade"]},
+    ]
+    assert match_area("Alvalade", areas) == "lisboa-alvalade"
+    # Order in the list must not matter.
+    assert match_area("Alvalade", list(reversed(areas))) == "lisboa-alvalade"
