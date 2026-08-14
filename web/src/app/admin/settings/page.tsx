@@ -3,6 +3,7 @@ import type { DisqualifyKeyword } from "@prisma/client";
 
 import KeywordManager from "@/components/KeywordManager";
 import SettingsForm from "@/components/SettingsForm";
+import WipeLeadsButton from "@/components/WipeLeadsButton";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/session";
 
@@ -75,6 +76,19 @@ export default async function SettingsPage() {
             ([category, items]) => ({ category, items }),
           )}
         />
+      </section>
+
+      <section
+        className="surface"
+        style={{ padding: "var(--space-6)", marginTop: "var(--space-6)" }}
+      >
+        <h2 style={{ color: "var(--color-danger)" }}>Danger Zone</h2>
+        <p>
+          Permanently delete all sourced leads from the database. This action cannot be undone.
+        </p>
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <WipeLeadsButton />
+        </div>
       </section>
     </div>
   );

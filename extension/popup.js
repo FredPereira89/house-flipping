@@ -51,4 +51,16 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 2000);
     });
   });
+
+  document.getElementById("forceRunBtn").addEventListener("click", () => {
+    const btn = document.getElementById("forceRunBtn");
+    btn.disabled = true;
+    btn.textContent = "Running...";
+    chrome.runtime.sendMessage({ type: "FORCE_RUN_CAPTURE" }, (response) => {
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = "Run Now";
+      }, 1000);
+    });
+  });
 });

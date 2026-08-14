@@ -27,10 +27,18 @@ def parse_detail(url: str, html: str) -> dict:
 
     # Idealista detail pages serve photos through <picture><img> with the
     # real (often larger) URL in data-src and a low-res placeholder in src.
+    # `picture img` is not scoped to the gallery -- the site header's own
+    # logo and the language-selector's flag icons are also <picture><img>
+    # elements, and both live on an idealista.pt subdomain, so a bare
+    # "idealista.pt" substring check wrongly captured them as if they were
+    # property photos (confirmed live: position 0 was consistently
+    # st3.idealista.pt's own logo SVG, with real photos starting at
+    # position 1). Real property photos are served from the img4
+    # subdomain's image CDN path specifically -- match on that instead.
     image_urls: list[str] = []
     for pic in soup.select("picture img"):
         src = pic.get("data-src") or pic.get("src")
-        if src and "idealista.pt" in src:
+        if src and "img4.idealista.pt" in src and "image.master" in src:
             image_urls.append(src)
 
     if not description and not image_urls:

@@ -53,6 +53,18 @@ def test_ignores_non_idealista_domains_and_missing_src(parsed):
     assert len(parsed["image_urls"]) == 2
 
 
+def test_ignores_site_chrome_on_the_img4_domain_that_is_not_a_property_photo(parsed):
+    """Regression test: the site header's logo and the language-selector's
+    flag icons are also <picture><img> elements, also on an idealista.pt
+    subdomain -- a bare "idealista.pt" substring check wrongly captured
+    them as photo position 0 on every real detail-page capture (confirmed
+    live: st3.idealista.pt's own logo SVG, gallery photos starting only at
+    position 1). Only img4.idealista.pt's image-CDN path is a real photo."""
+    assert not any("logo-default" in u for u in parsed["image_urls"])
+    assert not any("/flags/" in u for u in parsed["image_urls"])
+    assert len(parsed["image_urls"]) == 2
+
+
 def test_empty_page_logs_but_does_not_raise(caplog):
     result = parse_detail(URL, "<html><body>nothing here</body></html>")
     assert result == {"description": "", "image_urls": []}

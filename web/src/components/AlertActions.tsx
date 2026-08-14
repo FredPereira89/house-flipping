@@ -57,24 +57,26 @@ export default function AlertActions({
   }
 
   return (
-    <div className="alert-row__actions">
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "var(--space-2)" }}>
       {error && <p className="alert-row__error">{error}</p>}
-      <button
-        type="button"
-        className="button button--primary"
-        disabled={pendingAction !== null}
-        onClick={() => handleAction("resolve")}
-      >
-        {pendingAction === "resolve" ? "Resolving…" : "Resolve"}
-      </button>
-      <button
-        type="button"
-        className="button"
-        disabled={pendingAction !== null}
-        onClick={() => handleAction("dismiss")}
-      >
-        {pendingAction === "dismiss" ? "Dismissing…" : "Dismiss"}
-      </button>
+      <div className="alert-row__actions">
+        <button
+          type="button"
+          className="button button--primary"
+          disabled={pendingAction !== null}
+          onClick={() => handleAction("resolve")}
+        >
+          {pendingAction === "resolve" ? "Resolving…" : "Resolve"}
+        </button>
+        <button
+          type="button"
+          className="button"
+          disabled={pendingAction !== null}
+          onClick={() => handleAction("dismiss")}
+        >
+          {pendingAction === "dismiss" ? "Dismissing…" : "Dismiss"}
+        </button>
+      </div>
     </div>
   );
 }

@@ -45,8 +45,16 @@ const STALE_JOB_MS = 90 * 1000;
 // Hard cap on pages processed per search job, so a portal that never runs
 // out of "next page" links can't keep one tab alive forever. Persisted
 // alongside pageCount in ACTIVE_JOB_KEY, so the cap holds even if the
-// worker restarts mid-job.
-const MAX_SEARCH_PAGES = 10;
+// worker restarts mid-job. Raised from 10 to 30 (2026-08-14, user request)
+// to cover more of a large drawn-area search (one real search returned
+// 3,143 results; 10 pages only ever reached ~300) -- kept well short of
+// "cover everything in one run" specifically to avoid a single very long
+// scraping session that risks tripping Idealista's anti-bot detection
+// again (see HANDOFF.md §4g/§4j for the URL-scheme-change incident this
+// project already hit once). content.js's existing 3-7s randomized delay
+// between pages is unchanged, so 30 pages is ~30 x that gap, not a denser
+// request rate -- just a longer session.
+const MAX_SEARCH_PAGES = 30;
 
 // chrome.storage.local key holding the single in-flight job, or absent if
 // none. Shape: { tabId, kind, pageCount, jobUrl, startedAt, lastCheckinAt }
@@ -256,6 +264,11 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.alarms) {
   });
 
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === "FORCE_RUN_CAPTURE") {
+      runCaptureLoop().then(() => sendResponse({ ok: true }));
+      return true;
+    }
+
     const tabId = sender.tab && sender.tab.id;
     if (tabId == null) return undefined;
 

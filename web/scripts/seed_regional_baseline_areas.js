@@ -71,6 +71,42 @@ function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// Idealista's own hyphenated convention drops DICOFRE's bureaucratic
+// prefix ("União das freguesias de X") AND its municipality-wrap
+// ("Abrantes (São Vicente e São João) e Alferrarede") entirely -- real
+// ad text for that exact freguesia is just "São Vicente - São João -
+// Alferrarede", no "Abrantes", no parens. normalizeFreguesiaName()'s own
+// wrap handling only covers a wrap around the ENTIRE remaining string
+// (`^municipio (...)$`); this one can sit mid-string with trailing
+// content after the closing paren, so it needs its own unwrap (in place,
+// not stripped as a whole-string match) before hyphenating.
+// Idealista is inconsistent about how it renders a compound freguesia
+// name even between its OWN pages: the price-report tool's own freguesia
+// list favours the hyphenated form, but real search-card address text
+// often keeps the literal word "e" ("São Miguel do Rio Torto e Rossio ao
+// Sul do Tejo", not "... - Rossio ..."), with no bureaucratic prefix and
+// no municipality-wrap either. Neither the bureaucratic-full alias nor
+// the hyphenated one matches that -- this bare form (prefix/wrap
+// stripped, connector words left alone) is the third variant needed.
+function toBareAlias(freguesiaName, municipio) {
+  let n = freguesiaName.replace(/^União das freguesias d[aeo]s? /i, "");
+  const wrapRe = new RegExp(`\\b${escapeRegex(municipio)}\\s*\\(([^)]+)\\)`, "gi");
+  return n.replace(wrapRe, "$1");
+}
+
+function toHyphenatedAlias(freguesiaName, municipio) {
+  let n = freguesiaName.replace(/^União das freguesias d[aeo]s? /i, "");
+  // `g` flag: some DICOFRE names wrap the municipality around MULTIPLE
+  // separate fragments, not just one -- e.g. Santarém's 4-parish union is
+  // "Santarém (Marvila), Santa Iria da Ribeira de Santarém, Santarém (São
+  // Salvador) e Santarém (São Nicolau)", three separate wraps. A
+  // non-global replace only unwrapped the first, leaving the other two
+  // still wrapped (and thus still not matching real ad text).
+  const wrapRe = new RegExp(`\\b${escapeRegex(municipio)}\\s*\\(([^)]+)\\)`, "gi");
+  n = n.replace(wrapRe, "$1");
+  return n.replace(/,\s*/g, " - ").replace(/\s+e\s+/g, " - ");
+}
+
 function slugify(text) {
   return text
     .toString()
@@ -182,7 +218,11 @@ async function main() {
     // what Idealista's own slug looks like when a wrap is present.
     const bestGuessName = candidates[candidates.length - 1];
     const fregSlug = slugify(bestGuessName);
-    const idealistaUrl = `venda/${distSlug}/${muniSlug}/${fregSlug}/`;
+    // Idealista's district-level slug carries a "-provincias" suffix
+    // (e.g. "lisboa-provincias", not "lisboa") -- concelho/freguesia
+    // slugs are unaffected. Confirmed live 2026-08-13; not reflected in
+    // any fixture captured before that date.
+    const idealistaUrl = `venda/${distSlug}-provincias/${muniSlug}/${fregSlug}/`;
 
     let matched = null;
     if (isAmlConcelho) {
@@ -202,8 +242,35 @@ async function main() {
         needsReview.push({ freguesia: f.freguesia, municipio: f.municipio, distrito: f.distrito, reason: `ambiguous: area '${matched.name}' already matched by another freguesia this run` });
         continue;
       }
-      if (matched.idealistaUrl) continue; // already populated by an earlier run
       updatedAreaIds.add(matched.id);
+
+      // Alias enrichment: matching this DICOFRE freguesia against the area
+      // only proves the *name* lines up -- it says nothing about whether
+      // real ad text will ever match this area at runtime. match_area()
+      // only ever sees `aliases`, which historically only ever held
+      // config.json's own spelling/format. Two real, live examples of this
+      // failing: config.json's "Algirão-Mem Martins" (a typo -- the real
+      // freguesia is "Algueirão-Mem Martins", and ads spell it correctly,
+      // so they never matched) and "União das freguesias de Alhandra, São
+      // João dos Montes e Calhandriz" (config.json's bureaucratic form --
+      // real ad cards say "Alhandra - São João dos Montes - Calhandriz",
+      // Idealista's own hyphenated convention). Add DICOFRE's own name
+      // (correctly spelled) and a hyphenated variant approximating
+      // Idealista's convention, alongside whatever's already there --
+      // never remove an existing alias, only add matching surface.
+      const hyphenated = toHyphenatedAlias(f.freguesia, f.municipio);
+      const bare = toBareAlias(f.freguesia, f.municipio);
+      const newAliases = [...new Set([...matched.aliases, f.freguesia, hyphenated, bare])];
+
+      if (matched.idealistaUrl) {
+        // URL already populated by an earlier run -- still worth backfilling
+        // aliases if they're missing, but don't touch idealistaUrl/district
+        // fields again.
+        if (newAliases.length > matched.aliases.length) {
+          toUpdate.push({ id: matched.id, name: matched.name, aliasesOnly: newAliases });
+        }
+        continue;
+      }
       toUpdate.push({
         id: matched.id,
         name: matched.name,
@@ -211,6 +278,7 @@ async function main() {
         municipality: f.municipio,
         district: f.distrito,
         idealistaUrl,
+        aliases: newAliases,
       });
       continue;
     }
@@ -219,6 +287,11 @@ async function main() {
     if (seenSlugs.has(newSlug)) continue; // duplicate freguesia name within the dataset itself
     seenSlugs.add(newSlug);
 
+    // Same hyphenated-variant convention as the merge path above -- these
+    // areas get the same real-ad-text matching gap otherwise (only ever
+    // carrying DICOFRE's bureaucratic name as their sole alias).
+    const newRowHyphenated = toHyphenatedAlias(f.freguesia, f.municipio);
+    const newRowBare = toBareAlias(f.freguesia, f.municipio);
     const newRow = {
       slug: newSlug,
       name: `${f.freguesia}, ${f.municipio}, ${f.distrito}`,
@@ -226,7 +299,7 @@ async function main() {
       municipality: f.municipio,
       district: f.distrito,
       idealistaUrl,
-      aliases: [f.freguesia],
+      aliases: [...new Set([f.freguesia, newRowHyphenated, newRowBare])],
     };
 
     if (isAmlConcelho) {
@@ -243,9 +316,13 @@ async function main() {
     }
   }
 
-  console.log(`\nWill UPDATE ${toUpdate.length} existing areas (merge idealista_url in, keep id/slug):`);
+  console.log(`\nWill UPDATE ${toUpdate.length} existing areas (merge idealista_url/aliases in, keep id/slug):`);
   for (const u of toUpdate) {
-    console.log(`  - ${u.name}  ->  idealista_url=${u.idealistaUrl}`);
+    console.log(
+      u.aliasesOnly
+        ? `  - ${u.name}  ->  alias backfill only, now: ${JSON.stringify(u.aliasesOnly)}`
+        : `  - ${u.name}  ->  idealista_url=${u.idealistaUrl}  aliases=${JSON.stringify(u.aliases)}`,
+    );
   }
 
   console.log(`\nWill CREATE ${newInAmlConcelho.length} new areas inside AML concelhos (finer-grained than the existing row):`);
@@ -272,6 +349,10 @@ async function main() {
   }
 
   for (const u of toUpdate) {
+    if (u.aliasesOnly) {
+      await prisma.area.update({ where: { id: u.id }, data: { aliases: u.aliasesOnly } });
+      continue;
+    }
     await prisma.area.update({
       where: { id: u.id },
       data: {
@@ -279,11 +360,19 @@ async function main() {
         municipality: u.municipality,
         district: u.district,
         idealistaUrl: u.idealistaUrl,
+        aliases: u.aliases,
       },
     });
   }
 
   for (const c of [...newInAmlConcelho, ...toCreate]) {
+    // A rerun always re-derives this row via toCreate/newInAmlConcelho
+    // (never toUpdate -- see the alias-enrichment comment above for why
+    // these rows can never be recognized as an existing-area match), so
+    // the update path must also merge in any new alias candidates rather
+    // than leaving whatever was stored on first creation untouched.
+    const existing = await prisma.area.findUnique({ where: { slug: c.slug }, select: { aliases: true } });
+    const mergedAliases = existing ? [...new Set([...existing.aliases, ...c.aliases])] : c.aliases;
     await prisma.area.upsert({
       where: { slug: c.slug },
       update: {
@@ -291,6 +380,7 @@ async function main() {
         municipality: c.municipality,
         district: c.district,
         idealistaUrl: c.idealistaUrl,
+        aliases: mergedAliases,
       },
       create: c,
     });

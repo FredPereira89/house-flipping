@@ -17,6 +17,9 @@ data/
 captures/
 debug_page.html
 .remember/
+.playwright-mcp/
+.pytest_cache/
+.superpowers/
 
 # OS
 Thumbs.db

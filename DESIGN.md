@@ -151,7 +151,7 @@ A near-monochrome ink/paper scale in a barely-tinted cool gray (oklch hue 260), 
 - **Paper Elevated** (`oklch(100% 0 0)`): Card/surface background — pure white against the barely-tinted page, the only place true white appears.
 - **Paper Subtle** (`oklch(96% 0.006 260)`): Recessed surfaces — input backgrounds inside a card, hover fill for nav links and default buttons.
 - **Rule** (`oklch(90% 0.008 260)`): Default border/divider.
-- **Rule Strong** (`oklch(82% 0.012 260)`): Alert-row default left-border, emphasized dividers.
+- **Rule Strong** (`oklch(82% 0.012 260)`): Emphasized dividers.
 - **Ink** (`oklch(22% 0.02 260)`): Primary text.
 - **Ink Muted** (`oklch(46% 0.02 260)`): Secondary text — descriptions, labels, area names.
 - **Ink Faint** (`oklch(53% 0.015 260)`): Tertiary text — portal name, timestamps, stat labels. (Corrected from an initial `62%` that measured 3.45:1, below WCAG AA; now ~5:1.)

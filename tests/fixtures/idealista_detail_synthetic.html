@@ -22,6 +22,20 @@ totalmente renovado em 2023.</p>
       </div>
     </div>
 
+    <!-- Site-wide header chrome, present on every real Idealista page
+    before the actual gallery in document order -- also <picture><img>,
+    also on an idealista.pt subdomain, but NOT a property photo. This is
+    what a bare "idealista.pt" substring check wrongly captured as photo
+    position 0 on every single real detail-page capture. -->
+    <div class="header">
+      <picture>
+        <img src="https://st3.idealista.pt/static/common/img/icons/logo-default-no-margin.svg" alt="idealista logo">
+      </picture>
+      <picture>
+        <img src="https://st3.idealista.pt/static/common/release/modules/resources/img/flags/pt.svg" alt="PT flag">
+      </picture>
+    </div>
+
     <div class="gallery">
       <picture>
         <source srcset="https://img4.idealista.pt/blur/WEB_LISTING-M/0/id.pro.pt.image.master/aa/bb/cc/thumb.jpg">

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Area, SourcingLead } from "@prisma/client";
 
 import DuplicateBadge from "@/components/DuplicateBadge";
+import LeadQuickActions from "@/components/LeadQuickActions";
 import { displayTitle } from "@/lib/leads";
 
 export type LeadWithArea = SourcingLead & { area: Area | null };
@@ -52,14 +53,13 @@ function formatDiscount(value: unknown): string | null {
 export default function LeadCard({
   lead,
   isDuplicate,
+  index,
 }: {
   lead: LeadWithArea;
   isDuplicate: boolean;
+  index?: number;
 }) {
   const isHot = lead.status === "hot_lead";
-  // Canonical enum (design spec §sourcing_leads.status, `ingest/app.py`) is
-  // evaluating/hot_lead/rejected/offer_made/acquired — "disqualified" never
-  // occurs and was dead code.
   const isRejected = lead.status === "rejected";
 
   // Gross €/m² is the primary metric; fall back to useful area when a
@@ -75,6 +75,8 @@ export default function LeadCard({
 
   return (
     <article
+      data-lead-id={lead.id}
+      data-lead-index={index}
       className={`lead-card surface${isHot ? " lead-card--hot" : ""}${isRejected ? " lead-card--rejected" : ""}`}
       aria-label={title}
     >
@@ -90,7 +92,9 @@ export default function LeadCard({
       </header>
 
       <h3 className="lead-card__title">
-        <Link href={`/leads/${lead.id}`}>{title}</Link>
+        <Link href={`/leads/${lead.id}`} className="lead-card__link">
+          {title}
+        </Link>
       </h3>
 
       <p className="lead-card__area">
@@ -132,6 +136,14 @@ export default function LeadCard({
           </dd>
         </div>
       </dl>
+
+      <footer className="lead-card__footer">
+        <LeadQuickActions
+          leadId={lead.id}
+          initialStatus={lead.status}
+          portalUrl={lead.url}
+        />
+      </footer>
     </article>
   );
 }

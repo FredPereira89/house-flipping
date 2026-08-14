@@ -69,6 +69,34 @@ function randomDelayMs(min, max) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  const CONTENT_WAIT_POLL_MS = 250;
+  const CONTENT_WAIT_TIMEOUT_MS = 8000;
+
+  // Idealista's price-report page (baseline captures) renders its price
+  // card asynchronously after the initial document load -- run_at:
+  // "document_idle" in manifest.json fires at roughly window.onload, which
+  // is too early to reliably see it. Poll for the selector instead of
+  // guessing a fixed delay; if it never appears (a genuine "no data for
+  // this freguesia" page, same shape as a real N/A result), give up after
+  // the timeout and capture whatever's there -- the parser already handles
+  // a missing price card by returning None, so this must not hang forever.
+  function waitForSelector(selector, timeoutMs) {
+    return new Promise((resolve) => {
+      const deadline = Date.now() + timeoutMs;
+      (function poll() {
+        if (document.querySelector(selector)) {
+          resolve(true);
+          return;
+        }
+        if (Date.now() >= deadline) {
+          resolve(false);
+          return;
+        }
+        setTimeout(poll, CONTENT_WAIT_POLL_MS);
+      })();
+    });
+  }
+
   async function getSecret() {
     try {
       const { ingestSecret } = await chrome.storage.local.get("ingestSecret");
@@ -155,6 +183,10 @@ function randomDelayMs(min, max) {
       // no auto-navigation) so ordinary browsing on these sites is
       // unaffected.
       return;
+    }
+
+    if (kind === "baseline") {
+      await waitForSelector(".current-values-list__item", CONTENT_WAIT_TIMEOUT_MS);
     }
 
     const secret = await getSecret();

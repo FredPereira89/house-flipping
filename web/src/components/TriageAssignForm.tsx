@@ -15,10 +15,12 @@ type AreaOption = Pick<Area, "id" | "name" | "municipality">;
  */
 export default function TriageAssignForm({
   leadId,
+  leadTitle,
   areas,
   popoverId,
 }: {
   leadId: string;
+  leadTitle: string;
   areas: AreaOption[];
   popoverId: string;
 }) {
@@ -68,6 +70,7 @@ export default function TriageAssignForm({
 
   return (
     <form onSubmit={handleSubmit} className="triage-popover__form">
+      <h3 style={{ margin: "0 0 var(--space-3)", fontSize: "var(--fs-lg)" }}>{leadTitle}</h3>
       <label htmlFor={`${popoverId}-select`} className="triage-popover__label">
         Assign to area
       </label>

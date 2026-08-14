@@ -64,7 +64,13 @@ export function displayTitle(lead: {
  * mutates the stored `description` -- same raw-in/clean-display split as
  * `displayTitle()` above. */
 export function cleanDescription(description: string): string {
-  return description
+  let cleaned = description.trim();
+  // We may have both a photo counter and a map disclaimer, one after the other.
+  // Since both regexes use the ^ anchor, we replace sequentially and trim in between.
+  cleaned = cleaned.replace(PHOTO_COUNTER_RE, "").trim();
+  cleaned = cleaned.replace(MAP_DISCLAIMER_RE, "").trim();
+  
+  return cleaned
     .replace(/[ \t]+/g, " ")
     .replace(TRAILING_CTA_ROW_RE, "")
     .trim();

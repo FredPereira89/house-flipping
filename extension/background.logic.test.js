@@ -20,7 +20,7 @@ function test(name, fn) {
 
 test("STALE_JOB_MS and MAX_SEARCH_PAGES are sane, documented bounds", () => {
   assert.strictEqual(STALE_JOB_MS, 90 * 1000);
-  assert.strictEqual(MAX_SEARCH_PAGES, 10);
+  assert.strictEqual(MAX_SEARCH_PAGES, 30);
 });
 
 test("isJobStale is false right after a check-in", () => {

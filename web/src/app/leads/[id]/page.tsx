@@ -2,6 +2,9 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import DeleteLeadButton from "@/components/DeleteLeadButton";
+import LeadDetailNav from "@/components/LeadDetailNav";
+import LeadStatusManager from "@/components/LeadStatusManager";
 import PhotoCarousel from "@/components/PhotoCarousel";
 import PriceHistoryGraph from "@/components/PriceHistoryGraph";
 import { cleanDescription, displayTitle } from "@/lib/leads";
@@ -33,19 +36,6 @@ function toNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/**
- * Fetches a single `SourcingLead` scoped to the caller's org, along with its
- * photos and price history. `cache()` (React's per-request memoization, not
- * a persistent cache) lets both `generateMetadata` and the page component
- * call this without issuing the query twice for the same request.
- *
- * Security: `orgId` is always part of the `where` clause, never applied as
- * a filter after the fact — a lead ID belonging to another org simply
- * doesn't match any row here, so it 404s exactly like a nonexistent ID
- * would. This is the same pattern as `prisma.sourcingLead.findUnique` +
- * manual org check used in `api/triage/assign/route.ts`, just expressed as
- * a single `findFirst` since we only ever need a read here.
- */
 const getLead = cache(async (id: string, orgId: string) => {
   return prisma.sourcingLead.findFirst({
     where: { id, orgId },
@@ -93,23 +83,48 @@ export default async function LeadDetailPage({
     notFound();
   }
 
-  // Baseline comparison (Task 3 Step 3): `AreaPriceBaseline` is global
-  // reference data (D9), so it's looked up without an org filter — only
-  // scoped by the lead's own `areaId`, taking the most recent `period`.
-  const baseline = lead.areaId
-    ? await prisma.areaPriceBaseline.findFirst({
-        where: { areaId: lead.areaId },
+  const [ownBaseline, prevLead, nextLead] = await Promise.all([
+    lead.areaId
+      ? prisma.areaPriceBaseline.findFirst({
+          where: { areaId: lead.areaId },
+          orderBy: { period: "desc" },
+        })
+      : Promise.resolve(null),
+    prisma.sourcingLead.findFirst({
+      where: { orgId, lastSeenAt: { gt: lead.lastSeenAt }, status: { not: "rejected" } },
+      orderBy: { lastSeenAt: "asc" },
+      select: { id: true },
+    }),
+    prisma.sourcingLead.findFirst({
+      where: { orgId, lastSeenAt: { lt: lead.lastSeenAt }, status: { not: "rejected" } },
+      orderBy: { lastSeenAt: "desc" },
+      select: { id: true },
+    }),
+  ]);
+
+  let baseline = ownBaseline;
+  let baselineIsMunicipalityFallback = false;
+  if (!baseline && lead.area?.municipality) {
+    const municipalityArea = await prisma.area.findFirst({
+      where: {
+        freguesia: null,
+        municipality: lead.area.municipality,
+        id: { not: lead.areaId ?? undefined },
+      },
+      select: { id: true },
+    });
+    if (municipalityArea) {
+      baseline = await prisma.areaPriceBaseline.findFirst({
+        where: { areaId: municipalityArea.id },
         orderBy: { period: "desc" },
-      })
-    : null;
+      });
+      baselineIsMunicipalityFallback = baseline !== null;
+    }
+  }
 
   const isHot = lead.status === "hot_lead";
   const title = displayTitle(lead);
 
-  // Area name/municipality/raw-location-text regularly coincide (e.g. a
-  // seeded area whose municipality equals its own name, or a raw location
-  // string that's just the area's name) -- showing each value only once
-  // avoids "Campo de Ourique (Campo de Ourique) — Campo de Ourique".
   const locationParts: string[] = [];
   if (lead.area) {
     locationParts.push(
@@ -124,128 +139,227 @@ export default async function LeadDetailPage({
     locationParts.push(lead.rawLocationText);
   }
   const locationLine = locationParts.join(" — ");
-  const pricePerSqm = toNumber(lead.pricePerSqmGross ?? lead.pricePerSqmUseful);
+
+  const priceVal = toNumber(lead.price);
+  const pricePerSqmGross = toNumber(lead.pricePerSqmGross);
+  const pricePerSqmUseful = toNumber(lead.pricePerSqmUseful);
+  const pricePerSqm = pricePerSqmGross ?? pricePerSqmUseful;
+  const grossArea = toNumber(lead.areaSqmGross);
+  const usefulArea = toNumber(lead.areaSqmUseful);
+  const landArea = toNumber(lead.landAreaSqm);
   const baselinePricePerSqm = toNumber(baseline?.pricePerSqm);
-  const priceLabel = toNumber(lead.price);
-  const discountLabel = toNumber(lead.discountPct);
+  const discountVal = toNumber(lead.discountPct);
 
   let baselineDeltaPct: number | null = null;
   if (pricePerSqm !== null && baselinePricePerSqm !== null && baselinePricePerSqm !== 0) {
     baselineDeltaPct = ((pricePerSqm - baselinePricePerSqm) / baselinePricePerSqm) * 100;
   }
 
+  // Plain-object serialization for Next.js Client Components (Prisma Decimals -> Numbers)
+  const serializedPriceHistory = lead.priceHistory.map((h) => ({
+    price: Number(h.price),
+    observedAt: h.observedAt,
+  }));
+
   return (
-    <div className="container" style={{ paddingBlock: "var(--space-8)" }}>
-      <a id="lead-detail-back-link" href="/" className="lead-detail__back">
-        ← Back to leads
-      </a>
+    <div className="lead-detail-page">
+      <div className="container">
+        {/* Top Breadcrumb & Traversal Bar */}
+        <LeadDetailNav
+          prevLeadId={prevLead?.id}
+          nextLeadId={nextLead?.id}
+          leadId={lead.id}
+        />
 
-      <header className="lead-detail__header">
-        <div className="lead-detail__badges">
-          {isHot && <span className="badge badge--hot">Hot lead</span>}
-          <span className="lead-detail__portal">{lead.portal}</span>
-        </div>
-        <h1>{title}</h1>
-        <p className="lead-detail__area">{locationLine}</p>
-      </header>
-
-      <PhotoCarousel leadId={lead.id} photos={lead.photos} title={title} />
-
-      <div className="lead-detail__grid">
-        <section className="surface lead-detail__stats" aria-labelledby="lead-detail-stats-heading">
-          <h2 id="lead-detail-stats-heading">Listing stats</h2>
-          <dl className="lead-detail__stats-list">
-            <div className="lead-detail__stat">
-              <dt>Price</dt>
-              <dd>{priceLabel !== null ? currencyFormatter.format(priceLabel) : "—"}</dd>
-            </div>
-            <div className="lead-detail__stat">
-              <dt>€/m²</dt>
-              <dd>{pricePerSqm !== null ? `${numberFormatter.format(pricePerSqm)} €/m²` : "—"}</dd>
-            </div>
-            <div className="lead-detail__stat">
-              <dt>Discount</dt>
-              <dd>{discountLabel !== null ? `${percentFormatter.format(discountLabel)}%` : "—"}</dd>
-            </div>
-            <div className="lead-detail__stat">
-              <dt>Typology</dt>
-              <dd>{lead.typology !== null ? `T${lead.typology}` : "—"}</dd>
-            </div>
-            <div className="lead-detail__stat">
-              <dt>Gross area</dt>
-              <dd>{toNumber(lead.areaSqmGross) !== null ? `${numberFormatter.format(toNumber(lead.areaSqmGross)!)} m²` : "—"}</dd>
-            </div>
-            <div className="lead-detail__stat">
-              <dt>Useful area</dt>
-              <dd>{toNumber(lead.areaSqmUseful) !== null ? `${numberFormatter.format(toNumber(lead.areaSqmUseful)!)} m²` : "—"}</dd>
-            </div>
-          </dl>
-          <a
-            id="lead-detail-source-link"
-            href={lead.url}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="button button--primary lead-detail__source-link"
-          >
-            View original listing
-          </a>
-        </section>
-
-        <section className="surface lead-detail__baseline" aria-labelledby="lead-detail-baseline-heading">
-          <h2 id="lead-detail-baseline-heading">Baseline comparison</h2>
-          {!lead.areaId ? (
-            <p className="lead-detail__baseline-empty">
-              No baseline available — this lead has no matched area yet.
-            </p>
-          ) : !baseline ? (
-            <p className="lead-detail__baseline-empty">
-              No baseline available for {lead.area?.name ?? "this area"} yet.
-            </p>
-          ) : (
-            <dl className="lead-detail__stats-list">
-              <div className="lead-detail__stat">
-                <dt>Area baseline ({periodFormatter.format(baseline.period)})</dt>
-                <dd>{numberFormatter.format(Number(baseline.pricePerSqm))} €/m²</dd>
+        {/* Hero Title & Stage Bar Card */}
+        <div className="lead-hero surface">
+          <div className="lead-hero__header">
+            <div className="lead-hero__title-area">
+              <div className="lead-hero__tags">
+                {isHot && <span className="badge badge--hot">Hot deal 🔥</span>}
+                <span className="badge badge--brand">{lead.portal}</span>
+                {lead.typology !== null && (
+                  <span className="badge badge--muted">T{lead.typology}</span>
+                )}
+                {grossArea !== null && (
+                  <span className="badge badge--muted">{numberFormatter.format(grossArea)} m²</span>
+                )}
               </div>
-              <div className="lead-detail__stat">
-                <dt>vs. this listing</dt>
-                <dd
-                  className={
-                    baselineDeltaPct !== null && baselineDeltaPct < 0
-                      ? "lead-card__stat-value--positive"
-                      : undefined
-                  }
-                >
-                  {baselineDeltaPct !== null
-                    ? `${baselineDeltaPct > 0 ? "+" : ""}${percentFormatter.format(baselineDeltaPct)}%`
-                    : "—"}
-                </dd>
-              </div>
-              <div className="lead-detail__stat">
-                <dt>Source</dt>
-                <dd className="lead-detail__baseline-source">{baseline.source}</dd>
-              </div>
-            </dl>
-          )}
-        </section>
-      </div>
-
-      <section className="surface lead-detail__price-history" aria-labelledby="lead-detail-history-heading">
-        <h2 id="lead-detail-history-heading">Price history</h2>
-        <PriceHistoryGraph history={lead.priceHistory} />
-      </section>
-
-      {lead.description && (
-        <section className="surface lead-detail__description" aria-labelledby="lead-detail-description-heading">
-          <h2 id="lead-detail-description-heading">Description</h2>
-          {/* `white-space: pre-wrap` (globals.css) preserves the
-              multi-paragraph blank-line structure the ingest parser
-              extracts, without needing to split/rejoin the string here. */}
-          <div className="lead-detail__description-text">
-            {cleanDescription(lead.description)}
+              <h1 className="lead-hero__title">{title}</h1>
+              <p className="lead-hero__location">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M12 21s-7-5.5-7-11a7 7 0 1 1 14 0c0 5.5-7 11-7 11Z" />
+                  <circle cx="12" cy="10" r="2.5" />
+                </svg>
+                {locationLine}
+              </p>
+            </div>
+            <div className="lead-hero__delete-wrap">
+              <DeleteLeadButton leadId={lead.id} />
+            </div>
           </div>
-        </section>
-      )}
+
+          <div className="lead-hero__pipeline">
+            <LeadStatusManager leadId={lead.id} currentStatus={lead.status} />
+          </div>
+        </div>
+
+        {/* Photo Gallery Strip */}
+        <PhotoCarousel leadId={lead.id} photos={lead.photos} title={title} />
+
+        {/* 2-Column Analytics Layout */}
+        <div className="lead-detail__grid-layout">
+          {/* Left Column: Financials, Specs & Description */}
+          <div className="lead-detail__col-main">
+            {/* Financial Highlights */}
+            <div className="lead-financials surface">
+              <div className="lead-financials__stat">
+                <span className="lead-financials__label">Asking Price</span>
+                <span className="lead-financials__value lead-financials__value--price">
+                  {priceVal !== null ? currencyFormatter.format(priceVal) : "—"}
+                </span>
+              </div>
+              <div className="lead-financials__stat">
+                <span className="lead-financials__label">Price / m²</span>
+                <span className="lead-financials__value">
+                  {pricePerSqm !== null ? `${numberFormatter.format(pricePerSqm)} €` : "—"}
+                </span>
+              </div>
+              <div className="lead-financials__stat">
+                <span className="lead-financials__label">Discount vs Area</span>
+                <span className={`lead-financials__value ${discountVal !== null && discountVal > 0 ? "lead-financials__value--positive" : ""}`}>
+                  {discountVal !== null ? `${percentFormatter.format(discountVal)}%` : "—"}
+                </span>
+              </div>
+            </div>
+
+            {/* Property Specs Table */}
+            <div className="lead-specs surface">
+              <h2 className="lead-section-title">Property specifications</h2>
+              <div className="lead-specs__grid">
+                <div className="lead-specs__item">
+                  <span className="lead-specs__key">Typology</span>
+                  <span className="lead-specs__val">{lead.typology !== null ? `T${lead.typology}` : "—"}</span>
+                </div>
+                <div className="lead-specs__item">
+                  <span className="lead-specs__key">Gross Area</span>
+                  <span className="lead-specs__val">{grossArea !== null ? `${numberFormatter.format(grossArea)} m²` : "—"}</span>
+                </div>
+                <div className="lead-specs__item">
+                  <span className="lead-specs__key">Useful Area</span>
+                  <span className="lead-specs__val">{usefulArea !== null ? `${numberFormatter.format(usefulArea)} m²` : "—"}</span>
+                </div>
+                <div className="lead-specs__item">
+                  <span className="lead-specs__key">Land / Plot Area</span>
+                  <span className="lead-specs__val">{landArea !== null ? `${numberFormatter.format(landArea)} m²` : "—"}</span>
+                </div>
+                <div className="lead-specs__item">
+                  <span className="lead-specs__key">External Ref</span>
+                  <span className="lead-specs__val">{lead.externalId || "—"}</span>
+                </div>
+                <div className="lead-specs__item">
+                  <span className="lead-specs__key">Source Portal</span>
+                  <span className="lead-specs__val" style={{ textTransform: "capitalize" }}>{lead.portal}</span>
+                </div>
+              </div>
+
+              <div className="lead-specs__cta">
+                <a
+                  id="lead-detail-source-link"
+                  href={lead.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="button button--primary lead-specs__source-button"
+                >
+                  View original listing on {lead.portal} ↗
+                </a>
+              </div>
+            </div>
+
+            {/* Listing Description */}
+            {lead.description && (
+              <div className="lead-description surface">
+                <h2 className="lead-section-title">Listing description</h2>
+                <div className="lead-description__body">
+                  {cleanDescription(lead.description)}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: Baseline Benchmark & Price History */}
+          <div className="lead-detail__col-sidebar">
+            {/* Area Baseline Benchmark Card */}
+            <div className="lead-baseline surface">
+              <h2 className="lead-section-title">Area Price Benchmark</h2>
+              {!lead.areaId ? (
+                <p className="lead-detail__empty-note">
+                  No baseline available — this lead has no matched area yet.
+                </p>
+              ) : !baseline ? (
+                <p className="lead-detail__empty-note">
+                  No baseline data available for {lead.area?.name ?? "this area"} yet.
+                </p>
+              ) : (
+                <div className="lead-baseline__content">
+                  <div className="lead-baseline__metric-row">
+                    <div>
+                      <span className="lead-baseline__subhead">
+                        {baselineIsMunicipalityFallback
+                          ? `${lead.area?.municipality ?? "Concelho"} Benchmark`
+                          : "Area Baseline Benchmark"}
+                      </span>
+                      <div className="lead-baseline__price">
+                        {numberFormatter.format(Number(baseline.pricePerSqm))} €/m²
+                      </div>
+                    </div>
+                    <div className="lead-baseline__period">
+                      {periodFormatter.format(baseline.period)}
+                    </div>
+                  </div>
+
+                  {baselineDeltaPct !== null && (
+                    <div className="lead-baseline__comparison">
+                      <div className="lead-baseline__gauge-header">
+                        <span className="lead-baseline__gauge-label">Deal vs Market</span>
+                        <span className={`lead-baseline__gauge-delta ${baselineDeltaPct < 0 ? "lead-baseline__gauge-delta--good" : ""}`}>
+                          {baselineDeltaPct < 0
+                            ? `${percentFormatter.format(Math.abs(baselineDeltaPct))}% below market`
+                            : `${percentFormatter.format(baselineDeltaPct)}% above market`}
+                        </span>
+                      </div>
+                      <div className="lead-baseline__gauge-track">
+                        <div
+                          className={`lead-baseline__gauge-fill ${baselineDeltaPct < 0 ? "lead-baseline__gauge-fill--favorable" : "lead-baseline__gauge-fill--unfavorable"}`}
+                          style={{
+                            width: `${Math.min(100, Math.max(10, Math.abs(baselineDeltaPct)))}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {baselineIsMunicipalityFallback && (
+                    <p className="lead-baseline__fallback-notice">
+                      💡 No direct price report for {lead.area?.name ?? "this freguesia"} — using the {lead.area?.municipality} concelho average.
+                    </p>
+                  )}
+
+                  <div className="lead-baseline__source-footer">
+                    <span>Source: {baseline.source}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Price History Card */}
+            <div className="lead-price-history surface">
+              <h2 className="lead-section-title">Price observation history</h2>
+              <PriceHistoryGraph history={serializedPriceHistory} />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

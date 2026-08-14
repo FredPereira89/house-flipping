@@ -4,83 +4,218 @@
   <meta charset="utf-8">
   <title>House Flipping</title>
   <style>
+    :root {
+      --font-outfit: "Outfit", "Segoe UI", system-ui, -apple-system, sans-serif;
+      --color-terminal-blue: oklch(58% 0.16 258);
+      --color-terminal-blue-deep: oklch(48% 0.17 258);
+      --color-paper: oklch(98% 0.004 260);
+      --color-paper-elevated: oklch(100% 0 0);
+      --color-paper-subtle: oklch(96% 0.006 260);
+      --color-rule: oklch(90% 0.008 260);
+      --color-ink: oklch(22% 0.02 260);
+      --color-ink-muted: oklch(46% 0.02 260);
+      --color-ink-faint: oklch(53% 0.015 260);
+      --color-signal-success: oklch(62% 0.16 150);
+      
+      --radius-sm: 0.375rem;
+      --radius-md: 0.625rem;
+      --radius-lg: 1rem;
+      --radius-full: 999px;
+
+      --space-1: 0.25rem;
+      --space-2: 0.5rem;
+      --space-3: 0.75rem;
+      --space-4: 1rem;
+      --space-5: 1.5rem;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      width: 280px;
-      font-family: Arial, sans-serif;
-      padding: 15px;
-      background-color: #f4f4f9;
-      color: #333;
+      width: 320px;
+      font-family: var(--font-outfit);
+      padding: var(--space-4);
+      background-color: var(--color-paper);
+      color: var(--color-ink);
+      margin: 0;
+      line-height: 1.5;
     }
-    h3 { margin-top: 0; }
-    .status-card {
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      padding: 12px;
+
+    h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 var(--space-4) 0;
+      color: var(--color-ink);
+      letter-spacing: -0.01em;
     }
+
+    .surface {
+      background: var(--color-paper-elevated);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-rule);
+      padding: var(--space-4);
+      box-shadow: 0 1px 2px oklch(0% 0 0 / 0.06);
+    }
+
     .status-row {
       display: flex;
       justify-content: space-between;
-      padding: 6px 0;
-      font-size: 13px;
-      border-bottom: 1px solid #eee;
+      align-items: center;
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid var(--color-rule);
     }
-    .status-row:last-child { border-bottom: none; }
-    .status-row span:first-child { color: #777; }
-    .status-row strong { text-align: right; }
-    .hint {
-      font-size: 12px;
-      color: #777;
-      margin-top: 12px;
-      line-height: 1.4;
+
+    .status-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
     }
+
+    .status-row:first-child {
+      padding-top: 0;
+    }
+
+    .status-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-ink-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .status-value {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--color-ink);
+      text-align: right;
+    }
+
+    .action-row {
+      margin-top: var(--space-4);
+      display: flex;
+      justify-content: flex-end;
+    }
+
     .secret-row {
-      margin-top: 15px;
+      margin-top: var(--space-4);
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: var(--space-2);
+      background: var(--color-paper-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      border: 1px solid var(--color-rule);
     }
-    .secret-row label { font-size: 12px; color: #555; }
-    .secret-row input {
-      padding: 6px 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 13px;
+
+    .secret-row label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--color-ink-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
     }
-    .secret-row button {
-      padding: 8px 10px;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 5px;
+
+    .input-group {
+      display: flex;
+      gap: var(--space-2);
+    }
+
+    input[type="password"] {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--color-rule);
+      background-color: var(--color-paper-elevated);
+      color: var(--color-ink);
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      font-family: inherit;
+    }
+
+    input[type="password"]:focus-visible {
+      outline: 2px solid var(--color-terminal-blue);
+      outline-offset: 2px;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
       cursor: pointer;
-      font-size: 13px;
     }
-    .secret-row button:hover { background-color: #45a049; }
-    #secretStatus { font-size: 12px; color: #2e7d32; min-height: 14px; }
+
+    .btn-default {
+      background-color: var(--color-paper-elevated);
+      color: var(--color-ink);
+      border: 1px solid var(--color-rule);
+      border-radius: var(--radius-md);
+      padding: 0.5rem 1rem;
+      transition: background-color 0.1s ease;
+    }
+
+    .btn-default:hover {
+      background-color: var(--color-rule);
+    }
+
+    .btn-default:focus-visible {
+      outline: 2px solid var(--color-terminal-blue);
+      outline-offset: 2px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--color-terminal-blue), oklch(66% 0.14 220));
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 0.5rem 1rem;
+      font-weight: 500;
+      box-shadow: 0 1px 2px oklch(0% 0 0 / 0.06);
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 4px 16px oklch(0% 0 0 / 0.10);
+    }
+
+    .btn-primary:active {
+      transform: scale(0.97);
+    }
+
+    .btn-primary:focus-visible {
+      outline: 2px solid var(--color-terminal-blue);
+      outline-offset: 2px;
+    }
+
+    #secretStatus {
+      font-size: 0.75rem;
+      color: var(--color-signal-success);
+      font-weight: 600;
+      min-height: 14px;
+      text-align: right;
+    }
   </style>
 </head>
 <body>
   <h3>Houseflip Sourcing Engine</h3>
 
-  <div class="status-card">
-    <div class="status-row"><span>Last run</span><strong id="lastRunAt">&mdash;</strong></div>
-    <div class="status-row"><span>Status</span><strong id="lastRunStatus">&mdash;</strong></div>
-    <div class="status-row"><span>Queue depth</span><strong id="lastQueueDepth">&mdash;</strong></div>
-    <div class="status-row"><span>Last capture</span><strong id="lastCaptureAt">&mdash;</strong></div>
-    <div class="status-row"><span>Capture result</span><strong id="lastCaptureResult">&mdash;</strong></div>
+  <div class="surface">
+    <div class="status-row"><span class="status-label">Last update</span><span class="status-value" id="lastRunAt">&mdash;</span></div>
+    <div class="status-row"><span class="status-label">Status</span><span class="status-value" id="lastRunStatus">&mdash;</span></div>
+    <div class="status-row"><span class="status-label">Pending</span><span class="status-value" id="lastQueueDepth">&mdash;</span></div>
+    <div class="status-row"><span class="status-label">Last scrape</span><span class="status-value" id="lastCaptureAt">&mdash;</span></div>
+    <div class="status-row"><span class="status-label">Result</span><span class="status-value" id="lastCaptureResult">&mdash;</span></div>
+    
+    <div class="action-row">
+      <button id="forceRunBtn" class="btn-primary">Run Now</button>
+    </div>
   </div>
 
-  <p class="hint">
-    Capture runs automatically in the background every couple of minutes
-    (chrome.alarms). There is no manual on/off switch &mdash; this popup is a
-    read-only status view for debugging.
-  </p>
-
   <div class="secret-row">
-    <label for="secretInput">Ingest shared secret (X-Ingest-Secret)</label>
-    <input type="password" id="secretInput" placeholder="dev-secret (default)" autocomplete="off">
-    <button id="saveSecretBtn">Save</button>
+    <label for="secretInput">API Key</label>
+    <div class="input-group">
+      <input type="password" id="secretInput" placeholder="dev-secret (default)" autocomplete="off">
+      <button id="saveSecretBtn" class="btn-default">Save</button>
+    </div>
     <div id="secretStatus"></div>
   </div>
 

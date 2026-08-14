@@ -82,6 +82,7 @@ export default async function TriagePage() {
                 <div id={popoverId} popover="auto" className="triage-popover">
                   <TriageAssignForm
                     leadId={lead.id}
+                    leadTitle={lead.title ?? "Untitled listing"}
                     areas={areas}
                     popoverId={popoverId}
                   />

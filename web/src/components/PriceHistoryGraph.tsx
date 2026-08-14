@@ -1,6 +1,11 @@
-import type { LeadPriceHistory } from "@prisma/client";
+"use client";
 
-type PricePoint = Pick<LeadPriceHistory, "price" | "observedAt">;
+import { useState } from "react";
+
+export interface PricePoint {
+  price: number | string;
+  observedAt: Date;
+}
 
 const currencyFormatter = new Intl.NumberFormat("pt-PT", {
   style: "currency",
@@ -16,34 +21,34 @@ const dateFormatter = new Intl.DateTimeFormat("pt-PT", {
 
 const WIDTH = 600;
 const HEIGHT = 160;
-const PAD_X = 12;
-const PAD_Y = 16;
+const PAD_X = 20;
+const PAD_Y = 24;
 
-/**
- * Lightweight price-over-time chart for a lead's detail page. A hand-rolled
- * inline SVG polyline — no charting library, per the plan's "keep it
- * lightweight" note for Task 3 Step 2. X-axis is scaled by actual elapsed
- * time between observations (not just row index), so an uneven capture
- * cadence still reads correctly.
- */
 export default function PriceHistoryGraph({ history }: { history: PricePoint[] }) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
   const points = history
-    .map((entry) => ({ price: Number(entry.price), observedAt: entry.observedAt }))
+    .map((entry) => ({ price: Number(entry.price), observedAt: new Date(entry.observedAt) }))
     .filter((entry) => Number.isFinite(entry.price));
 
   if (points.length === 0) {
     return (
-      <p className="price-history__empty">No price history recorded yet.</p>
+      <div className="price-history-empty">
+        <p>No price history recorded yet.</p>
+      </div>
     );
   }
 
   if (points.length === 1) {
     return (
-      <p className="price-history__empty">
-        Only one price observed so far:{" "}
-        {currencyFormatter.format(points[0].price)} on{" "}
-        {dateFormatter.format(points[0].observedAt)}.
-      </p>
+      <div className="price-history-single">
+        <div className="price-history-single__price">
+          {currencyFormatter.format(points[0].price)}
+        </div>
+        <div className="price-history-single__badge">
+          <span>First observed on {dateFormatter.format(points[0].observedAt)}</span>
+        </div>
+      </div>
     );
   }
 
@@ -58,7 +63,6 @@ export default function PriceHistoryGraph({ history }: { history: PricePoint[] }
 
   const coords = points.map((p) => ({
     x: PAD_X + ((p.observedAt.getTime() - minTime) / timeSpan) * (WIDTH - PAD_X * 2),
-    // SVG y grows downward, so a higher price needs a smaller y.
     y: HEIGHT - PAD_Y - ((p.price - minPrice) / priceSpan) * (HEIGHT - PAD_Y * 2),
     ...p,
   }));
@@ -66,6 +70,8 @@ export default function PriceHistoryGraph({ history }: { history: PricePoint[] }
   const polylinePoints = coords
     .map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`)
     .join(" ");
+
+  const areaPoints = `${coords[0].x.toFixed(1)},${HEIGHT} ${polylinePoints} ${coords[coords.length - 1].x.toFixed(1)},${HEIGHT}`;
 
   const first = points[0];
   const last = points[points.length - 1];
@@ -77,39 +83,69 @@ export default function PriceHistoryGraph({ history }: { history: PricePoint[] }
         ? "price-history__trend--up"
         : undefined;
 
+  const activePoint = hoveredIdx !== null ? coords[hoveredIdx] : coords[coords.length - 1];
+
   return (
     <div className="price-history">
-      <svg
-        className="price-history__svg"
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        role="img"
-        aria-label={`Price history from ${currencyFormatter.format(first.price)} on ${dateFormatter.format(first.observedAt)} to ${currencyFormatter.format(last.price)} on ${dateFormatter.format(last.observedAt)}`}
-      >
-        <polyline points={polylinePoints} className="price-history__line" fill="none" />
-        {coords.map((c, index) => (
-          <circle
-            key={index}
-            cx={c.x}
-            cy={c.y}
-            r={3}
-            className="price-history__dot"
-          />
-        ))}
-      </svg>
-      <div className="price-history__legend">
-        <span>
-          {dateFormatter.format(first.observedAt)} ·{" "}
-          {currencyFormatter.format(first.price)}
-        </span>
-        <span className={trendClass}>
+      <div className="price-history__header">
+        <div className="price-history__active-stat">
+          <span className="price-history__active-label">
+            {hoveredIdx !== null ? "Selected point" : "Current price"}
+          </span>
+          <span className="price-history__active-price">
+            {currencyFormatter.format(activePoint.price)}
+          </span>
+          <span className="price-history__active-date">
+            {dateFormatter.format(activePoint.observedAt)}
+          </span>
+        </div>
+
+        <div className={`price-history__trend-pill ${trendClass || ""}`}>
           {trend === 0
-            ? "No change"
-            : `${trend > 0 ? "+" : ""}${currencyFormatter.format(trend)}`}
-        </span>
-        <span>
-          {dateFormatter.format(last.observedAt)} ·{" "}
-          {currencyFormatter.format(last.price)}
-        </span>
+            ? "Stable price"
+            : `${trend > 0 ? "▲ +" : "▼ "}${currencyFormatter.format(trend)} (${((trend / first.price) * 100).toFixed(1)}%)`}
+        </div>
+      </div>
+
+      <div className="price-history__chart-wrap">
+        <svg
+          className="price-history__svg"
+          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          role="img"
+          aria-label={`Price history from ${currencyFormatter.format(first.price)} to ${currencyFormatter.format(last.price)}`}
+        >
+          <defs>
+            <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-brand)" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="var(--color-brand)" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+
+          <polygon points={areaPoints} fill="url(#priceGradient)" />
+          <polyline points={polylinePoints} className="price-history__line" fill="none" strokeWidth="2.5" />
+
+          {coords.map((c, index) => (
+            <g
+              key={index}
+              onMouseEnter={() => setHoveredIdx(index)}
+              onMouseLeave={() => setHoveredIdx(null)}
+              style={{ cursor: "pointer" }}
+            >
+              <circle
+                cx={c.x}
+                cy={c.y}
+                r={hoveredIdx === index ? 6 : 4}
+                className={`price-history__dot${hoveredIdx === index ? " price-history__dot--active" : ""}`}
+              />
+              <circle cx={c.x} cy={c.y} r={14} fill="transparent" />
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      <div className="price-history__legend">
+        <span>Start: {dateFormatter.format(first.observedAt)}</span>
+        <span>Latest: {dateFormatter.format(last.observedAt)}</span>
       </div>
     </div>
   );
